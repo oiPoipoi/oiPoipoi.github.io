@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Robot Animator Pro v5</title>
+    <style>
+        body { font-family: sans-serif; background: #1e1e2e; color: #cdd6f4; text-align: center; padding: 20px; margin: 0; }
+        .card { background: #313244; padding: 25px; border-radius: 12px; display: inline-block; max-width: 650px; width: 100%; box-shadow: 0 8px 16px rgba(0,0,0,0.6); }
+        h2, h3 { margin-top: 0; color: #89b4fa; }
+        .slider-container { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; background: #45475a; padding: 10px; border-radius: 8px; }
+        input[type=range] { flex-grow: 1; margin: 0 15px; cursor: pointer; }
+        button { padding: 8px 12px; margin: 4px; cursor: pointer; border-radius: 6px; border: none; background: #89b4fa; color: #11111b; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #b4befe; }
+        button:disabled { background: #585b70; color: #a6adc8; cursor: not-allowed; opacity: 0.7; }
+        .danger { background: #f38ba8; } .danger:hover { background: #eba0ac; }
+        .success { background: #a6e3a1; } .success:hover { background: #94e2d5; }
+        .warning { background: #f9e2af; } .warning:hover { background: #f5e0dc; }
+        .purple { background: #cba6f7; } .purple:hover { background: #b4befe; }
+        textarea { width: 90%; height: 60px; margin-top: 10px; background: #11111b; color: #a6e3a1; border: 1px solid #585b70; padding: 10px; font-family: monospace; border-radius: 6px; resize: vertical; }
+        select { padding: 8px; border-radius: 6px; background: #11111b; color: #cdd6f4; border: 1px solid #585b70; font-weight: bold; }
+        .controls-row { display: flex; justify-content: center; gap: 10px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+        
+        /* Modal Styles */
+        #conflict-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #181825; border: 2px solid #f38ba8; padding: 30px; border-radius: 12px; text-align: left; max-width: 400px; }
+        .modal-content p { font-size: 1.1em; }
+        .modal-buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+
+        .wiimote-box { border: 2px dashed #cba6f7; padding: 15px; border-radius: 8px; background: #181825; margin-bottom: 20px;}
+    </style>
+</head>
+<body>
+    <!-- Conflict Resolution Modal -->
+    <div id="conflict-modal">
+        <div class="modal-content">
+            <h3 style="color:#f38ba8; margin-bottom:10px;">⚠️ Import Conflict</h3>
+            <p id="conflict-text" style="font-weight:bold; color:#f9e2af;">Slot X has conflicting data.</p>
+            <p><strong>🏠 Local Version:</strong> <span id="conf-local" style="color:#a6e3a1;">0</span> frames</p>
+            <p><strong>☁️ Import Version:</strong> <span id="conf-imp" style="color:#89b4fa;">0</span> frames</p>
+            
+            <div class="modal-buttons">
+                <button class="success" onclick="resolveConflict('local')">🏠 Keep Local</button>
+                <button class="danger" onclick="resolveConflict('import')">⬇️ Overwrite</button>
+                <button class="purple" onclick="resolveConflict('merge')">🔗 Merge</button>
+                <button onclick="cancelImport()" style="background:#585b70; color:white; margin-top:10px;">❌ Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🤖 Robot Animator Pro v5</h2>
+        <div class="controls-row">
+            <button id="connect" class="success">🔌 Connect Arduino USB</button>
+        </div>
+        <p id="status" style="color: #f9e2af; font-weight: bold;">Arduino: Disconnected</p>
+        
+        <!-- NEW WIIMOTE SECTION -->
+        <div class="wiimote-box">
+            <h3 style="color: #cba6f7; margin-bottom: 5px;">🎮 Wiimote Controller</h3>
+            <p style="font-size: 0.8em; margin-top: 0;">Pair via OS Bluetooth first, then click connect!</p>
+            <button id="wii-connect" class="purple" onclick="connectWiimote()">📡 Connect Wiimote</button>
+            <p id="wii-status" style="color: #a6adc8; font-weight: bold; margin-bottom: 0;">Status: Disconnected</p>
+            <p id="wii-instructions" style="font-size: 0.85em; color: #f9e2af; display: none;">
+                <strong>CALIBRATE:</strong> Hold flat facing forward, press <b>+</b><br>
+                <strong>GRIPPER:</strong> Press <b>B</b> (Trigger)<br>
+                <strong>PAUSE ARM:</strong> Hold <b>A</b> while moving
+            </p>
+        </div>
+
+        <div id="sliders"></div>
+        
+        <hr style="border-color: #585b70; margin: 20px 0;">
+        
+        <h3>🎬 Animation & Playback</h3>
+        <button class="success" onclick="saveFrame()">➕ Save Pose to Frame</button>
+        <button class="danger" onclick="clearFrames()">🗑️ Clear Frames</button>
+        <p>Active Frames: <span id="frameCount" style="font-weight:bold; color:#a6e3a1; font-size: 1.2em;">0</span></p>
+        
+        <div class="controls-row" style="background: #181825; padding: 15px; border-radius: 8px;">
+            <button id="play-btn" class="success" onclick="togglePlay()">▶️ Play</button>
+            <button class="danger" onclick="stopPlay()">⏹️ Stop</button>
+            <label style="margin-left: 10px; cursor: pointer; font-weight: bold;">
+                <input type="checkbox" id="loop-toggle"> 🔁 Loop Current
+            </label>
+        </div>
+
+        <div class="controls-row" style="background: #181825; padding: 15px; border-radius: 8px; margin-top: 10px;">
+            <div style="display: flex; flex-direction: column; align-items: center; width: 45%;">
+                <label style="font-weight: bold; color: #89b4fa; margin-bottom: 5px;">Frame Speed: <span id="speed-val">600</span>ms</label>
+                <input type="range" id="frame-speed" min="100" max="2000" step="50" value="600" oninput="document.getElementById('speed-val').innerText = this.value">
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; width: 45%;">
+                <label style="font-weight: bold; color: #cba6f7; margin-bottom: 5px;">Macro Pause: <span id="pause-val">1.0</span>s</label>
+                <input type="range" id="macro-pause" min="0" max="5000" step="100" value="1000" oninput="document.getElementById('pause-val').innerText = (this.value/1000).toFixed(1)">
+            </div>
+        </div>
+        
+        <hr style="border-color: #585b70; margin: 20px 0;">
+
+        <h3>💾 Library & Macros</h3>
+        <div class="controls-row">
+            <select id="slotSelect"></select>
+            <button class="success" onclick="saveToSlot()">💾 Save to Slot</button>
+            <button class="warning" onclick="loadFromSlot()">📂 Load Slot</button>
+        </div>
+        <div class="controls-row" style="margin-top:15px;">
+            <button id="slideshow-btn" class="purple" onclick="toggleMacro(false)">🎞️ Slideshow All</button>
+            <button id="shuffle-btn" class="purple" onclick="toggleMacro(true)">🔀 Shuffle All</button>
+        </div>
+
+        <hr style="border-color: #585b70; margin: 20px 0;">
+        
+        <h3>📦 Backup & Restore</h3>
+        <button onclick="exportAll()">⬇️ Export All 15 Slots</button>
+        <button onclick="startImport()" class="warning">⬆️ Import & Merge</button>
+        <textarea id="io-box" placeholder="Exported code for ALL 15 slots will appear here. Paste code here to import."></textarea>
+    </div>
+
+    <script>
+        let port, writer;
+        const currentPos = [90, 90, 90, 90, 90, 90, 90];
+        let currentFrames = [];
+        let savedAnimations = JSON.parse(localStorage.getItem('robotAnims')) || Array(15).fill(null);
+
+        // UI Setup
+        const servoNames = ['Base (0)', 'Shoulders (1 & 2)', 'Hidden', 'Elbow (3)', 'Wrist Pitch (4)', 'Wrist Roll (5)', 'Gripper (6)'];
+        const sliderDiv = document.getElementById('sliders');
+        for(let i=0; i<7; i++) {
+            if(i === 2) continue;
+            sliderDiv.innerHTML += `
+                <div class="slider-container">
+                    <span style="width: 140px; text-align: left;">${servoNames[i]}</span>
+                    <input type="range" id="s${i}" min="0" max="180" value="90" oninput="updateServo(${i}, this.value)">
+                    <span id="v${i}" style="width:35px; text-align:right; font-weight:bold;">90°</span>
+                </div>`;
+        }
+
+        updateSlotDropdown();
+
+        // Connect USB (Arduino)
+        document.getElementById('connect').onclick = async () => {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                writer = port.writable.getWriter();
+                document.getElementById('status').innerText = "Arduino: Connected!";
+                document.getElementById('status').style.color = "#a6e3a1";
+                document.getElementById('connect').style.display = "none";
+            } catch (err) {
+                alert("Connection failed! Check USB and permissions.");
+            }
+        };
+
+        // Standard Slider Update
+        async function updateServo(index, value) {
+            currentPos[index] = parseInt(value);
+            document.getElementById(`v${index}`).innerText = value + "°";
+            queueSerialUpdate(); // Use throttled sender
+        }
+
+        // --- USB THROTTLER (Prevents crashing Arduino) ---
+        let serialTimeout = null;
+        async function queueSerialUpdate() {
+            // Limits commands to roughly 20 times per second
+            if (!serialTimeout && writer) {
+                serialTimeout = setTimeout(async () => {
+                    await writer.write(new TextEncoder().encode(`ALL:${currentPos.join(',')}\n`));
+                    serialTimeout = null;
+                }, 50); 
+            }
+        }
+
+        // --- WIIMOTE INTEGRATION (WebHID) ---
+        let wiimote = null;
+        let isWiiCalibrated = false;
+        let wiiCalib = {x: 128, y: 128, z: 128}; // Defaults
+        let gripperClosed = false;
+        let lastB = false;
+
+        async function connectWiimote() {
+            if (!navigator.hid) return alert("WebHID is not supported in this browser. Please use Chrome/Chromium.");
+            try {
+                // Vendor 0x057e is Nintendo
+                const devices = await navigator.hid.requestDevice();
+                if (devices.length > 0) {
+                    wiimote = devices[0];
+                    await wiimote.open();
+                    
+                    // Request Data Reporting Mode 0x31 (Core Buttons + Accelerometer)
+                    await wiimote.sendReport(0x12, new Uint8Array([0x00, 0x31]));
+                    wiimote.addEventListener('inputreport', handleWiiData);
+                    
+                    document.getElementById('wii-status').innerText = "Status: Waiting for Calibration (+)";
+                    document.getElementById('wii-status').style.color = "#f9e2af";
+                    document.getElementById('wii-instructions').style.display = "block";
+                    document.getElementById('wii-connect').style.display = "none";
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Could not connect Wiimote. Ensure it is paired in your OS Bluetooth settings first!");
+            }
+        }
+
+        function handleWiiData(event) {
+            if (event.reportId !== 0x31) return; // Ignore non-accel reports
+            
+            const data = event.data;
+            const btn0 = data.getUint8(0);
+            const btn1 = data.getUint8(1);
+
+            // Button Parsing (Standard Wiimote mapping)
+            const btnA = (btn1 & 0x08) !== 0;
+            const btnB = (btn1 & 0x04) !== 0;
+            const btnPlus = (btn0 & 0x10) !== 0;
+
+            // Raw Accel Parsing
+            const ax = data.getUint8(2);
+            const ay = data.getUint8(3);
+            const az = data.getUint8(4);
+
+            // Calibration Sequence
+            if (btnPlus) {
+                wiiCalib = {x: ax, y: ay, z: az};
+                isWiiCalibrated = true;
+                document.getElementById('wii-status').innerText = "Status: Calibrated & Active!";
+                document.getElementById('wii-status').style.color = "#a6e3a1";
+            }
+
+            if (!isWiiCalibrated) return;
+
+            // Gripper Logic (Toggle on B button press)
+            if (btnB && !lastB) {
+                gripperClosed = !gripperClosed;
+                let gripVal = gripperClosed ? 180 : 90;
+                currentPos[6] = gripVal;
+                document.getElementById('s6').value = gripVal;
+                document.getElementById('v6').innerText = gripVal + "°";
+                queueSerialUpdate();
+            }
+            lastB = btnB;
+
+            // Pause Logic (A Button Hold)
+            if (btnA) {
+                document.getElementById('wii-status').innerText = "Status: PAUSED (Moving Freely)";
+                document.getElementById('wii-status').style.color = "#f38ba8";
+                return; // Skips sending positional updates
+            } else {
+                document.getElementById('wii-status').innerText = "Status: Calibrated & Active!";
+                document.getElementById('wii-status').style.color = "#a6e3a1";
+            }
+
+            // Motion mapping (Multiplier of ~3 converts raw gravity delta to degrees)
+            let pitch = 90 + ((ay - wiiCalib.y) * 3); // Maps to Shoulder
+            let roll = 90 - ((ax - wiiCalib.x) * 3);  // Maps to Base
+
+            // Clamp values between 0 and 180 to protect servos
+            pitch = Math.max(0, Math.min(180, Math.round(pitch)));
+            roll = Math.max(0, Math.min(180, Math.round(roll)));
+
+            // Only update if values actually changed (saves processing)
+            if (currentPos[1] !== pitch || currentPos[0] !== roll) {
+                currentPos[1] = pitch;
+                currentPos[0] = roll;
+                
+                // Update UI Sliders
+                document.getElementById('s1').value = pitch;
+                document.getElementById('v1').innerText = pitch + "°";
+                document.getElementById('s0').value = roll;
+                document.getElementById('v0').innerText = roll + "°";
+                
+                queueSerialUpdate();
+            }
+        }
+
+        // --- ANIMATION / MACRO LOGIC BELOW ---
+        // (This remains unchanged from v4)
+        function saveFrame() {
+            currentFrames.push([...currentPos]);
+            document.getElementById('frameCount').innerText = currentFrames.length;
+        }
+
+        function clearFrames() {
+            stopPlay();
+            currentFrames = [];
+            document.getElementById('frameCount').innerText = "0";
+        }
+
+        let isPlaying = false, isPaused = false, playIndex = 0, isMacroPlaying = false, activeLoopId = 0;
+
+        async function togglePlay() {
+            if (currentFrames.length === 0) return alert("Add some frames first!");
+            if (!isPlaying) {
+                isPlaying = true; isPaused = false; activeLoopId++;
+                document.getElementById('play-btn').innerText = "⏸️ Pause";
+                playLoop(activeLoopId);
+            } else if (!isPaused) {
+                isPaused = true; document.getElementById('play-btn').innerText = "▶️ Resume";
+            } else {
+                isPaused = false; document.getElementById('play-btn').innerText = "⏸️ Pause";
+            }
+        }
+
+        function stopPlay() {
+            isPlaying = false; isPaused = false; isMacroPlaying = false; activeLoopId++; playIndex = 0;
+            document.getElementById('play-btn').innerText = "▶️ Play";
+            let ssBtn = document.getElementById('slideshow-btn'); let shBtn = document.getElementById('shuffle-btn');
+            if (ssBtn && shBtn) {
+                ssBtn.innerText = "🎞️ Slideshow All"; ssBtn.className = "purple"; ssBtn.disabled = false;
+                shBtn.innerText = "🔀 Shuffle All"; shBtn.className = "purple"; shBtn.disabled = false;
+            }
+        }
+
+        async function playLoop(loopId) {
+            while (isPlaying && loopId === activeLoopId) {
+                if (isPaused) { await new Promise(r => setTimeout(r, 100)); continue; }
+                if (playIndex >= currentFrames.length) {
+                    if (document.getElementById('loop-toggle').checked && !isMacroPlaying) playIndex = 0; 
+                    else break; 
+                }
+                if (playIndex < currentFrames.length) {
+                    let frame = currentFrames[playIndex];
+                    frame.forEach((val, i) => {
+                        currentPos[i] = val;
+                        if (i !== 2) { document.getElementById(`s${i}`).value = val; document.getElementById(`v${i}`).innerText = val + "°"; }
+                    });
+                    queueSerialUpdate();
+                    playIndex++;
+                    let speedMs = parseInt(document.getElementById('frame-speed').value);
+                    await new Promise(r => setTimeout(r, speedMs)); 
+                }
+            }
+            if(!isMacroPlaying && loopId === activeLoopId) stopPlay();
+        }
+
+        async function toggleMacro(shuffle) {
+            if(isMacroPlaying) { stopPlay(); return; }
+            let activeSlots = [];
+            for(let i=0; i<15; i++) if(savedAnimations[i] && savedAnimations[i].length > 0) activeSlots.push(i);
+            if(activeSlots.length === 0) return alert("Your library is empty! Save some slots first.");
+            
+            stopPlay(); activeLoopId++; let macroLoopId = activeLoopId; isMacroPlaying = true;
+            
+            if (shuffle) {
+                document.getElementById('shuffle-btn').innerText = "⏹️ Stop Shuffle"; document.getElementById('shuffle-btn').className = "danger"; document.getElementById('slideshow-btn').disabled = true;
+            } else {
+                document.getElementById('slideshow-btn').innerText = "⏹️ Stop Slideshow"; document.getElementById('slideshow-btn').className = "danger"; document.getElementById('shuffle-btn').disabled = true;
+            }
+
+            while (isMacroPlaying && macroLoopId === activeLoopId) {
+                let playSequence = [...activeSlots];
+                if(shuffle) playSequence.sort(() => Math.random() - 0.5);
+
+                for(let slot of playSequence) {
+                    if(!isMacroPlaying || macroLoopId !== activeLoopId) break; 
+                    currentFrames = JSON.parse(JSON.stringify(savedAnimations[slot]));
+                    document.getElementById('frameCount').innerText = currentFrames.length;
+                    
+                    playIndex = 0; isPlaying = true; isPaused = false; document.getElementById('play-btn').innerText = "⏸️ Pause";
+                    await playLoop(macroLoopId); 
+                    if(!isMacroPlaying || macroLoopId !== activeLoopId) break; 
+
+                    let pauseMs = parseInt(document.getElementById('macro-pause').value);
+                    await new Promise(r => setTimeout(r, pauseMs));
+                }
+            }
+        }
+
+        // Storage & Export Logic
+        function updateSlotDropdown() {
+            const select = document.getElementById('slotSelect'); select.innerHTML = '';
+            for(let i=0; i<15; i++) {
+                let count = savedAnimations[i] ? savedAnimations[i].length : 0;
+                select.innerHTML += `<option value="${i}">Slot ${i+1} (${count > 0 ? count + ' frames' : 'Empty'})</option>`;
+            }
+        }
+
+        function saveToSlot() {
+            if(currentFrames.length === 0) return alert("No active frames to save!");
+            const slot = parseInt(document.getElementById('slotSelect').value);
+            savedAnimations[slot] = JSON.parse(JSON.stringify(currentFrames));
+            localStorage.setItem('robotAnims', JSON.stringify(savedAnimations));
+            updateSlotDropdown(); document.getElementById('slotSelect').value = slot;
+            alert(`Saved ${currentFrames.length} frames to Slot ${slot+1}!`);
+        }
+
+        function loadFromSlot() {
+            const slot = parseInt(document.getElementById('slotSelect').value);
+            if(!savedAnimations[slot] || savedAnimations[slot].length === 0) return alert("That slot is empty!");
+            stopPlay(); currentFrames = JSON.parse(JSON.stringify(savedAnimations[slot]));
+            document.getElementById('frameCount').innerText = currentFrames.length;
+            currentFrames[0].forEach((val, i) => {
+                if(i !== 2) { document.getElementById(`s${i}`).value = val; document.getElementById(`v${i}`).innerText = val + "°"; }
+                currentPos[i] = val;
+            });
+            queueSerialUpdate(); alert(`Loaded Slot ${slot+1}!`);
+        }
+
+        function exportAll() { document.getElementById('io-box').value = JSON.stringify(savedAnimations); alert("Exported! Copy the text."); }
+
+        let importConflicts = [], pendingImportData = [], currentConflictIndex = 0;
+
+        function startImport() {
+            try {
+                const data = JSON.parse(document.getElementById('io-box').value);
+                if(!Array.isArray(data) || data.length !== 15) throw new Error("Format");
+                importConflicts = []; pendingImportData = Array(15).fill(null);
+                for(let i=0; i<15; i++) {
+                    let local = savedAnimations[i], imp = data[i];
+                    if (imp && imp.length > 0) {
+                        if (local && local.length > 0 && JSON.stringify(local) !== JSON.stringify(imp)) importConflicts.push({ slot: i, local: local, imp: imp });
+                        else pendingImportData[i] = imp;
+                    } else pendingImportData[i] = local;
+                }
+                if (importConflicts.length > 0) { currentConflictIndex = 0; showConflictUI(); } else finishImport();
+            } catch(e) { alert("Invalid code!"); }
+        }
+
+        function showConflictUI() {
+            let conf = importConflicts[currentConflictIndex];
+            document.getElementById('conflict-text').innerText = `Conflict detected in Slot ${conf.slot + 1}:`;
+            document.getElementById('conf-local').innerText = conf.local.length; document.getElementById('conf-imp').innerText = conf.imp.length;
+            document.getElementById('conflict-modal').style.display = "flex";
+        }
+
+        function resolveConflict(decision) {
+            let conf = importConflicts[currentConflictIndex];
+            if (decision === 'local') pendingImportData[conf.slot] = conf.local;
+            else if (decision === 'import') pendingImportData[conf.slot] = conf.imp;
+            else if (decision === 'merge') pendingImportData[conf.slot] = conf.local.concat(conf.imp);
+            currentConflictIndex++;
+            if (currentConflictIndex < importConflicts.length) showConflictUI(); else { document.getElementById('conflict-modal').style.display = "none"; finishImport(); }
+        }
+
+        function cancelImport() { document.getElementById('conflict-modal').style.display = "none"; alert("Import cancelled."); }
+        function finishImport() { savedAnimations = pendingImportData; localStorage.setItem('robotAnims', JSON.stringify(savedAnimations)); updateSlotDropdown(); alert("Import complete!"); }
+    </script>
+</body>
+</html>
+
