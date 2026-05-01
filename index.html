@@ -1,42 +1,98 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Robot Animator Pro v5</title>
+    <title>Robot Animator Pro v5.2 | Cyber-Dash</title>
     <style>
-        body { font-family: sans-serif; background: #1e1e2e; color: #cdd6f4; text-align: center; padding: 20px; margin: 0; }
-        .card { background: #313244; padding: 25px; border-radius: 12px; display: inline-block; max-width: 650px; width: 100%; box-shadow: 0 8px 16px rgba(0,0,0,0.6); }
-        h2, h3 { margin-top: 0; color: #89b4fa; }
-        .slider-container { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; background: #45475a; padding: 10px; border-radius: 8px; }
-        input[type=range] { flex-grow: 1; margin: 0 15px; cursor: pointer; }
-        button { padding: 8px 12px; margin: 4px; cursor: pointer; border-radius: 6px; border: none; background: #89b4fa; color: #11111b; font-weight: bold; transition: 0.2s; }
-        button:hover { background: #b4befe; }
-        button:disabled { background: #585b70; color: #a6adc8; cursor: not-allowed; opacity: 0.7; }
-        .danger { background: #f38ba8; } .danger:hover { background: #eba0ac; }
-        .success { background: #a6e3a1; } .success:hover { background: #94e2d5; }
-        .warning { background: #f9e2af; } .warning:hover { background: #f5e0dc; }
-        .purple { background: #cba6f7; } .purple:hover { background: #b4befe; }
-        textarea { width: 90%; height: 60px; margin-top: 10px; background: #11111b; color: #a6e3a1; border: 1px solid #585b70; padding: 10px; font-family: monospace; border-radius: 6px; resize: vertical; }
-        select { padding: 8px; border-radius: 6px; background: #11111b; color: #cdd6f4; border: 1px solid #585b70; font-weight: bold; }
-        .controls-row { display: flex; justify-content: center; gap: 10px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+        :root {
+            --bg: #0b0e14;
+            --card-bg: rgba(30, 31, 46, 0.85);
+            --accent: #89b4fa;
+            --neon-blue: #00f2ff;
+            --neon-purple: #bc13fe;
+            --neon-green: #39ff14;
+            --neon-red: #f38ba8;
+        }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: var(--bg); 
+            background-image: radial-gradient(circle at 50% 50%, #1e1e2e 0%, #0b0e14 100%);
+            color: #cdd6f4; 
+            text-align: center; 
+            padding: 20px; 
+            margin: 0; 
+        }
+        .card { 
+            background: var(--card-bg); 
+            backdrop-filter: blur(15px);
+            padding: 25px; 
+            border-radius: 20px; 
+            display: inline-block; 
+            max-width: 850px; 
+            width: 100%; 
+            border: 1px solid rgba(137, 180, 250, 0.2);
+            box-shadow: 0 0 30px rgba(0,0,0,0.7);
+        }
+        h2 { text-transform: uppercase; letter-spacing: 2px; color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); margin-top: 0; }
+        h3 { color: var(--neon-purple); text-shadow: 0 0 5px var(--neon-purple); margin-bottom: 10px;}
         
-        /* Modal Styles */
-        #conflict-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background: #181825; border: 2px solid #f38ba8; padding: 30px; border-radius: 12px; text-align: left; max-width: 400px; }
-        .modal-content p { font-size: 1.1em; }
-        .modal-buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        /* LIVE HUD */
+        .hud-display {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(0,0,0,0.4);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--neon-blue);
+            box-shadow: inset 0 0 10px rgba(0, 242, 255, 0.1);
+        }
+        .hud-item { font-family: 'Courier New', monospace; border-left: 3px solid var(--neon-blue); padding: 5px; }
+        .hud-label { font-size: 0.75em; color: var(--accent); display: block; font-weight: bold;}
+        .hud-value { font-size: 1.5em; font-weight: bold; color: white; text-shadow: 0 0 5px white;}
 
-        .wiimote-box { border: 2px dashed #cba6f7; padding: 15px; border-radius: 8px; background: #181825; margin-bottom: 20px;}
+        /* Sliders */
+        .slider-container { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; transition: 0.3s; }
+        .slider-container:hover { background: rgba(255,255,255,0.1); }
+        input[type=range] { flex-grow: 1; margin: 0 15px; cursor: pointer; accent-color: var(--neon-blue); }
+
+        /* Buttons */
+        button { padding: 8px 12px; margin: 4px; cursor: pointer; border-radius: 6px; border: none; background: #585b70; color: white; font-weight: bold; transition: 0.2s; text-transform: uppercase; font-size: 0.8em; }
+        button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.2); }
+        button:disabled { background: #313244; color: #6c7086; cursor: not-allowed; opacity: 0.5; }
+        .success { background: var(--neon-green); color: black; box-shadow: 0 0 10px rgba(57, 255, 20, 0.3); }
+        .danger { background: var(--neon-red); color: black; box-shadow: 0 0 10px rgba(243, 139, 168, 0.3); }
+        .warning { background: #f9e2af; color: black; }
+        .purple { background: var(--neon-purple); color: white; box-shadow: 0 0 10px rgba(188, 19, 254, 0.4); }
+
+        /* Keyboard Hints & Hotkeys */
+        .keyboard-hint { font-size: 0.85em; color: #a6adc8; margin: 15px 0; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; }
+        kbd { background: #111; border: 1px solid #444; padding: 2px 6px; border-radius: 4px; color: var(--neon-green); font-family: monospace; font-weight: bold;}
+        
+        .hotkey-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px;}
+        .hotkey-slot { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; border: 1px solid #585b70; transition: 0.3s; }
+        .hotkey-slot.active { border-color: var(--neon-green); box-shadow: 0 0 8px rgba(57, 255, 20, 0.2); }
+        .hotkey-title { color: var(--neon-blue); font-weight: bold; font-size: 0.9em; margin-bottom: 5px; }
+
+        /* Inputs & Layout */
+        textarea { width: 90%; height: 60px; margin-top: 10px; background: #11111b; color: var(--neon-green); border: 1px solid #585b70; padding: 10px; font-family: monospace; border-radius: 6px; resize: vertical; }
+        select { padding: 8px; border-radius: 6px; background: #11111b; color: #cdd6f4; border: 1px solid var(--neon-purple); font-weight: bold; }
+        .controls-row { display: flex; justify-content: center; gap: 10px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+        .wiimote-box { border: 2px dashed var(--neon-purple); padding: 15px; border-radius: 8px; background: rgba(188, 19, 254, 0.05); margin-bottom: 20px;}
+        
+        /* Modal */
+        #conflict-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #181825; border: 2px solid var(--neon-red); padding: 30px; border-radius: 12px; text-align: left; max-width: 400px; box-shadow: 0 0 20px rgba(243, 139, 168, 0.4);}
+        .modal-buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
     </style>
 </head>
 <body>
-    <!-- Conflict Resolution Modal -->
     <div id="conflict-modal">
         <div class="modal-content">
-            <h3 style="color:#f38ba8; margin-bottom:10px;">⚠️ Import Conflict</h3>
+            <h3 style="color:var(--neon-red); margin-bottom:10px;">⚠️ Import Conflict</h3>
             <p id="conflict-text" style="font-weight:bold; color:#f9e2af;">Slot X has conflicting data.</p>
-            <p><strong>🏠 Local Version:</strong> <span id="conf-local" style="color:#a6e3a1;">0</span> frames</p>
-            <p><strong>☁️ Import Version:</strong> <span id="conf-imp" style="color:#89b4fa;">0</span> frames</p>
-            
+            <p><strong>🏠 Local Version:</strong> <span id="conf-local" style="color:var(--neon-green);">0</span> frames</p>
+            <p><strong>☁️ Import Version:</strong> <span id="conf-imp" style="color:var(--neon-blue);">0</span> frames</p>
             <div class="modal-buttons">
                 <button class="success" onclick="resolveConflict('local')">🏠 Keep Local</button>
                 <button class="danger" onclick="resolveConflict('import')">⬇️ Overwrite</button>
@@ -47,35 +103,50 @@
     </div>
 
     <div class="card">
-        <h2>🤖 Robot Animator Pro v5</h2>
-        <div class="controls-row">
-            <button id="connect" class="success">🔌 Connect Arduino USB</button>
-        </div>
-        <p id="status" style="color: #f9e2af; font-weight: bold;">Arduino: Disconnected</p>
+        <h2>🤖 Robot Animator Pro v5.2 <span id="sys-pulse" style="color:var(--neon-green); font-size:0.8em; opacity:0.2;">●</span></h2>
         
-        <!-- NEW WIIMOTE SECTION -->
+        <div class="controls-row">
+            <button id="connect" class="success">🔌 Connect USB</button>
+        </div>
+        <p id="status" style="color: #f9e2af; font-weight: bold; font-size: 0.9em;">Arduino: Offline</p>
+        
+        <div class="hud-display">
+            <div class="hud-item"><span class="hud-label">BASE [0]</span><span id="h0" class="hud-value">90°</span></div>
+            <div class="hud-item"><span class="hud-label">SHOULDER [1]</span><span id="h1" class="hud-value">90°</span></div>
+            <div class="hud-item"><span class="hud-label">ELBOW [3]</span><span id="h3" class="hud-value">90°</span></div>
+            <div class="hud-item"><span class="hud-label">W-PITCH [4]</span><span id="h4" class="hud-value">90°</span></div>
+            <div class="hud-item"><span class="hud-label">W-ROLL [5]</span><span id="h5" class="hud-value">90°</span></div>
+            <div class="hud-item"><span class="hud-label">GRIPPER [6]</span><span id="h6" class="hud-value">90°</span></div>
+        </div>
+
         <div class="wiimote-box">
-            <h3 style="color: #cba6f7; margin-bottom: 5px;">🎮 Wiimote Controller</h3>
-            <p style="font-size: 0.8em; margin-top: 0;">Pair via OS Bluetooth first, then click connect!</p>
-            <button id="wii-connect" class="purple" onclick="connectWiimote()">📡 Connect Wiimote</button>
+            <h3 style="margin-bottom: 5px;">🎮 Wiimote Controller</h3>
+            <button id="wii-connect" class="purple" onclick="connectWiimote()">📡 Sync Wiimote</button>
             <p id="wii-status" style="color: #a6adc8; font-weight: bold; margin-bottom: 0;">Status: Disconnected</p>
             <p id="wii-instructions" style="font-size: 0.85em; color: #f9e2af; display: none;">
-                <strong>CALIBRATE:</strong> Hold flat facing forward, press <b>+</b><br>
-                <strong>GRIPPER:</strong> Press <b>B</b> (Trigger)<br>
-                <strong>PAUSE ARM:</strong> Hold <b>A</b> while moving
+                <strong>CALIBRATE:</strong> Hold flat, press <b>+</b> | <strong>GRIP:</strong> Press <b>B</b> | <strong>PAUSE:</strong> Hold <b>A</b>
             </p>
         </div>
 
         <div id="sliders"></div>
-        
-        <hr style="border-color: #585b70; margin: 20px 0;">
+
+        <div class="keyboard-hint">
+            <strong>🎮 KEYBOARD OVERRIDE:</strong> <kbd>W</kbd> <kbd>S</kbd> Shoulder | <kbd>A</kbd> <kbd>D</kbd> Base | <kbd>SPACE</kbd> Grip | <kbd>F</kbd> Save Frame
+        </div>
+
+        <hr style="border-color: #45475a; margin: 20px 0;">
+
+        <h3>⚡ Quick-Pose Hotkeys (<kbd>1</kbd> - <kbd>0</kbd>)</h3>
+        <div class="hotkey-grid" id="hotkey-grid"></div>
+
+        <hr style="border-color: #45475a; margin: 20px 0;">
         
         <h3>🎬 Animation & Playback</h3>
         <button class="success" onclick="saveFrame()">➕ Save Pose to Frame</button>
         <button class="danger" onclick="clearFrames()">🗑️ Clear Frames</button>
-        <p>Active Frames: <span id="frameCount" style="font-weight:bold; color:#a6e3a1; font-size: 1.2em;">0</span></p>
+        <p>Active Frames: <span id="frameCount" style="font-weight:bold; color:var(--neon-green); font-size: 1.2em;">0</span></p>
         
-        <div class="controls-row" style="background: #181825; padding: 15px; border-radius: 8px;">
+        <div class="controls-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px;">
             <button id="play-btn" class="success" onclick="togglePlay()">▶️ Play</button>
             <button class="danger" onclick="stopPlay()">⏹️ Stop</button>
             <label style="margin-left: 10px; cursor: pointer; font-weight: bold;">
@@ -83,18 +154,18 @@
             </label>
         </div>
 
-        <div class="controls-row" style="background: #181825; padding: 15px; border-radius: 8px; margin-top: 10px;">
+        <div class="controls-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-top: 10px;">
             <div style="display: flex; flex-direction: column; align-items: center; width: 45%;">
-                <label style="font-weight: bold; color: #89b4fa; margin-bottom: 5px;">Frame Speed: <span id="speed-val">600</span>ms</label>
+                <label style="font-weight: bold; color: var(--accent); margin-bottom: 5px;">Frame Speed: <span id="speed-val">600</span>ms</label>
                 <input type="range" id="frame-speed" min="100" max="2000" step="50" value="600" oninput="document.getElementById('speed-val').innerText = this.value">
             </div>
             <div style="display: flex; flex-direction: column; align-items: center; width: 45%;">
-                <label style="font-weight: bold; color: #cba6f7; margin-bottom: 5px;">Macro Pause: <span id="pause-val">1.0</span>s</label>
+                <label style="font-weight: bold; color: var(--neon-purple); margin-bottom: 5px;">Macro Pause: <span id="pause-val">1.0</span>s</label>
                 <input type="range" id="macro-pause" min="0" max="5000" step="100" value="1000" oninput="document.getElementById('pause-val').innerText = (this.value/1000).toFixed(1)">
             </div>
         </div>
         
-        <hr style="border-color: #585b70; margin: 20px 0;">
+        <hr style="border-color: #45475a; margin: 20px 0;">
 
         <h3>💾 Library & Macros</h3>
         <div class="controls-row">
@@ -106,186 +177,210 @@
             <button id="slideshow-btn" class="purple" onclick="toggleMacro(false)">🎞️ Slideshow All</button>
             <button id="shuffle-btn" class="purple" onclick="toggleMacro(true)">🔀 Shuffle All</button>
         </div>
-
-        <hr style="border-color: #585b70; margin: 20px 0;">
+        
+        <hr style="border-color: #45475a; margin: 20px 0;">
         
         <h3>📦 Backup & Restore</h3>
-        <button onclick="exportAll()">⬇️ Export All 15 Slots</button>
+        <button onclick="exportAll()">⬇️ Export Slots & Hotkeys</button>
         <button onclick="startImport()" class="warning">⬆️ Import & Merge</button>
-        <textarea id="io-box" placeholder="Exported code for ALL 15 slots will appear here. Paste code here to import."></textarea>
+        <textarea id="io-box" placeholder="Exported code will appear here. Paste code here to import."></textarea>
     </div>
 
     <script>
         let port, writer;
-        const currentPos = [90, 90, 90, 90, 90, 90, 90];
+        let currentPos = [90, 90, 90, 90, 90, 90, 90];
         let currentFrames = [];
+        
+        // Memory states
         let savedAnimations = JSON.parse(localStorage.getItem('robotAnims')) || Array(15).fill(null);
+        let savedHotkeys = JSON.parse(localStorage.getItem('robotHotkeys')) || Array(10).fill(null);
 
-        // UI Setup
+        // --- UI MASTER SYNC ---
+        // Keeps HUD, Sliders, and memory perfectly aligned no matter who triggered the movement
+        function syncUI() {
+            for(let i=0; i<7; i++) {
+                if(i === 2) continue;
+                if(document.getElementById(`s${i}`)) document.getElementById(`s${i}`).value = currentPos[i];
+                if(document.getElementById(`v${i}`)) document.getElementById(`v${i}`).innerText = currentPos[i] + "°";
+                if(document.getElementById(`h${i}`)) document.getElementById(`h${i}`).innerText = currentPos[i] + "°";
+            }
+        }
+
+        // Generate Slider UI
         const servoNames = ['Base (0)', 'Shoulders (1 & 2)', 'Hidden', 'Elbow (3)', 'Wrist Pitch (4)', 'Wrist Roll (5)', 'Gripper (6)'];
         const sliderDiv = document.getElementById('sliders');
         for(let i=0; i<7; i++) {
             if(i === 2) continue;
             sliderDiv.innerHTML += `
                 <div class="slider-container">
-                    <span style="width: 140px; text-align: left;">${servoNames[i]}</span>
-                    <input type="range" id="s${i}" min="0" max="180" value="90" oninput="updateServo(${i}, this.value)">
-                    <span id="v${i}" style="width:35px; text-align:right; font-weight:bold;">90°</span>
+                    <span style="width: 140px; text-align: left; font-weight:bold;">${servoNames[i]}</span>
+                    <input type="range" id="s${i}" min="0" max="180" value="90" oninput="manualSliderUpdate(${i}, this.value)">
+                    <span id="v${i}" style="width:35px; text-align:right; font-weight:bold; color:var(--neon-blue);">90°</span>
                 </div>`;
         }
 
-        updateSlotDropdown();
+        function manualSliderUpdate(index, value) {
+            currentPos[index] = parseInt(value);
+            syncUI(); queueSerialUpdate(); 
+        }
 
-        // Connect USB (Arduino)
+        // --- USB CONNECTION ---
         document.getElementById('connect').onclick = async () => {
             try {
                 port = await navigator.serial.requestPort();
                 await port.open({ baudRate: 9600 });
                 writer = port.writable.getWriter();
-                document.getElementById('status').innerText = "Arduino: Connected!";
-                document.getElementById('status').style.color = "#a6e3a1";
+                document.getElementById('status').innerText = "Arduino: SYSTEM ONLINE";
+                document.getElementById('status').style.color = "var(--neon-green)";
                 document.getElementById('connect').style.display = "none";
-            } catch (err) {
-                alert("Connection failed! Check USB and permissions.");
-            }
+            } catch (err) { alert("Connection failed! Check Nobara permissions."); }
         };
 
-        // Standard Slider Update
-        async function updateServo(index, value) {
-            currentPos[index] = parseInt(value);
-            document.getElementById(`v${index}`).innerText = value + "°";
-            queueSerialUpdate(); // Use throttled sender
-        }
-
-        // --- USB THROTTLER (Prevents crashing Arduino) ---
         let serialTimeout = null;
         async function queueSerialUpdate() {
-            // Limits commands to roughly 20 times per second
             if (!serialTimeout && writer) {
+                // UI Pulse Effect for data transmission
+                document.getElementById('sys-pulse').style.opacity = "1";
+                document.getElementById('sys-pulse').style.color = "var(--neon-green)";
+                
                 serialTimeout = setTimeout(async () => {
                     await writer.write(new TextEncoder().encode(`ALL:${currentPos.join(',')}\n`));
                     serialTimeout = null;
+                    document.getElementById('sys-pulse').style.opacity = "0.2";
                 }, 50); 
             }
         }
 
-        // --- WIIMOTE INTEGRATION (WebHID) ---
+        // --- GAMING KEYBOARD CONTROLS ---
+        window.addEventListener('keydown', (e) => {
+            // Prevent keys from moving the robot while typing in the import box
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; 
+            
+            const key = e.key.toLowerCase();
+            let changed = false;
+
+            if (key === 'w') { currentPos[1] = Math.min(180, currentPos[1] + 5); changed = true; }
+            if (key === 's') { currentPos[1] = Math.max(0, currentPos[1] - 5); changed = true; }
+            if (key === 'a') { currentPos[0] = Math.min(180, currentPos[0] + 5); changed = true; }
+            if (key === 'd') { currentPos[0] = Math.max(0, currentPos[0] - 5); changed = true; }
+            if (key === ' ') { currentPos[6] = (currentPos[6] >= 180) ? 90 : 180; changed = true; e.preventDefault(); }
+            if (key === 'f') { saveFrame(); e.preventDefault(); }
+            
+            // Trigger Hotkeys 1-9 and 0
+            if (key >= '0' && key <= '9') {
+                let idx = key === '0' ? 9 : parseInt(key) - 1;
+                goHotkey(idx);
+            }
+
+            if (changed) { syncUI(); queueSerialUpdate(); }
+        });
+
+        // --- QUICK-POSE HOTKEYS ---
+        function renderHotkeys() {
+            const grid = document.getElementById('hotkey-grid');
+            grid.innerHTML = '';
+            for(let i=0; i<10; i++) {
+                let keyNum = i === 9 ? 0 : i + 1;
+                let hasData = savedHotkeys[i] !== null;
+                grid.innerHTML += `
+                    <div class="hotkey-slot ${hasData ? 'active' : ''}">
+                        <div class="hotkey-title">KEY [${keyNum}]</div>
+                        <button class="success" style="padding: 4px; font-size: 0.7em;" onclick="setHotkey(${i})">SET</button>
+                        <button class="purple" style="padding: 4px; font-size: 0.7em;" onclick="goHotkey(${i})" ${hasData ? '' : 'disabled'}>GO</button>
+                    </div>
+                `;
+            }
+        }
+        renderHotkeys();
+
+        function setHotkey(index) {
+            savedHotkeys[index] = [...currentPos];
+            localStorage.setItem('robotHotkeys', JSON.stringify(savedHotkeys));
+            renderHotkeys();
+        }
+
+        function goHotkey(index) {
+            if (savedHotkeys[index]) {
+                currentPos = [...savedHotkeys[index]];
+                syncUI(); queueSerialUpdate();
+            }
+        }
+
+        // --- WIIMOTE INTEGRATION ---
         let wiimote = null;
         let isWiiCalibrated = false;
-        let wiiCalib = {x: 128, y: 128, z: 128}; // Defaults
+        let wiiCalib = {x: 128, y: 128, z: 128}; 
         let gripperClosed = false;
         let lastB = false;
 
         async function connectWiimote() {
-            if (!navigator.hid) return alert("WebHID is not supported in this browser. Please use Chrome/Chromium.");
+            if (!navigator.hid) return alert("WebHID not supported.");
             try {
-                // Vendor 0x057e is Nintendo
-                const devices = await navigator.hid.requestDevice();
+                const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x057e }] });
                 if (devices.length > 0) {
-                    wiimote = devices[0];
-                    await wiimote.open();
-                    
-                    // Request Data Reporting Mode 0x31 (Core Buttons + Accelerometer)
+                    wiimote = devices[0]; await wiimote.open();
                     await wiimote.sendReport(0x12, new Uint8Array([0x00, 0x31]));
                     wiimote.addEventListener('inputreport', handleWiiData);
-                    
                     document.getElementById('wii-status').innerText = "Status: Waiting for Calibration (+)";
                     document.getElementById('wii-status').style.color = "#f9e2af";
                     document.getElementById('wii-instructions').style.display = "block";
                     document.getElementById('wii-connect').style.display = "none";
                 }
-            } catch (err) {
-                console.error(err);
-                alert("Could not connect Wiimote. Ensure it is paired in your OS Bluetooth settings first!");
-            }
+            } catch (err) { alert("Wiimote connection failed."); }
         }
 
         function handleWiiData(event) {
-            if (event.reportId !== 0x31) return; // Ignore non-accel reports
-            
-            const data = event.data;
-            const btn0 = data.getUint8(0);
-            const btn1 = data.getUint8(1);
+            if (event.reportId !== 0x31) return; 
+            const data = event.data, btn0 = data.getUint8(0), btn1 = data.getUint8(1);
+            const btnA = (btn1 & 0x08) !== 0, btnB = (btn1 & 0x04) !== 0, btnPlus = (btn0 & 0x10) !== 0;
+            const ax = data.getUint8(2), ay = data.getUint8(3), az = data.getUint8(4);
 
-            // Button Parsing (Standard Wiimote mapping)
-            const btnA = (btn1 & 0x08) !== 0;
-            const btnB = (btn1 & 0x04) !== 0;
-            const btnPlus = (btn0 & 0x10) !== 0;
-
-            // Raw Accel Parsing
-            const ax = data.getUint8(2);
-            const ay = data.getUint8(3);
-            const az = data.getUint8(4);
-
-            // Calibration Sequence
             if (btnPlus) {
-                wiiCalib = {x: ax, y: ay, z: az};
-                isWiiCalibrated = true;
+                wiiCalib = {x: ax, y: ay, z: az}; isWiiCalibrated = true;
                 document.getElementById('wii-status').innerText = "Status: Calibrated & Active!";
-                document.getElementById('wii-status').style.color = "#a6e3a1";
+                document.getElementById('wii-status').style.color = "var(--neon-green)";
             }
-
             if (!isWiiCalibrated) return;
 
-            // Gripper Logic (Toggle on B button press)
             if (btnB && !lastB) {
                 gripperClosed = !gripperClosed;
-                let gripVal = gripperClosed ? 180 : 90;
-                currentPos[6] = gripVal;
-                document.getElementById('s6').value = gripVal;
-                document.getElementById('v6').innerText = gripVal + "°";
-                queueSerialUpdate();
+                currentPos[6] = gripperClosed ? 180 : 90;
+                syncUI(); queueSerialUpdate();
             }
             lastB = btnB;
 
-            // Pause Logic (A Button Hold)
             if (btnA) {
                 document.getElementById('wii-status').innerText = "Status: PAUSED (Moving Freely)";
-                document.getElementById('wii-status').style.color = "#f38ba8";
-                return; // Skips sending positional updates
+                document.getElementById('wii-status').style.color = "var(--neon-red)";
+                return;
             } else {
                 document.getElementById('wii-status').innerText = "Status: Calibrated & Active!";
-                document.getElementById('wii-status').style.color = "#a6e3a1";
+                document.getElementById('wii-status').style.color = "var(--neon-green)";
             }
 
-            // Motion mapping (Multiplier of ~3 converts raw gravity delta to degrees)
-            let pitch = 90 + ((ay - wiiCalib.y) * 3); // Maps to Shoulder
-            let roll = 90 - ((ax - wiiCalib.x) * 3);  // Maps to Base
-
-            // Clamp values between 0 and 180 to protect servos
+            let pitch = 90 + ((ay - wiiCalib.y) * 3); 
+            let roll = 90 - ((ax - wiiCalib.x) * 3);  
             pitch = Math.max(0, Math.min(180, Math.round(pitch)));
             roll = Math.max(0, Math.min(180, Math.round(roll)));
 
-            // Only update if values actually changed (saves processing)
             if (currentPos[1] !== pitch || currentPos[0] !== roll) {
-                currentPos[1] = pitch;
-                currentPos[0] = roll;
-                
-                // Update UI Sliders
-                document.getElementById('s1').value = pitch;
-                document.getElementById('v1').innerText = pitch + "°";
-                document.getElementById('s0').value = roll;
-                document.getElementById('v0').innerText = roll + "°";
-                
-                queueSerialUpdate();
+                currentPos[1] = pitch; currentPos[0] = roll;
+                syncUI(); queueSerialUpdate();
             }
         }
 
-        // --- ANIMATION / MACRO LOGIC BELOW ---
-        // (This remains unchanged from v4)
+        // --- ANIMATION / MACRO LOGIC ---
         function saveFrame() {
             currentFrames.push([...currentPos]);
             document.getElementById('frameCount').innerText = currentFrames.length;
         }
-
         function clearFrames() {
-            stopPlay();
-            currentFrames = [];
+            stopPlay(); currentFrames = [];
             document.getElementById('frameCount').innerText = "0";
         }
 
         let isPlaying = false, isPaused = false, playIndex = 0, isMacroPlaying = false, activeLoopId = 0;
-
+        
         async function togglePlay() {
             if (currentFrames.length === 0) return alert("Add some frames first!");
             if (!isPlaying) {
@@ -302,7 +397,7 @@
         function stopPlay() {
             isPlaying = false; isPaused = false; isMacroPlaying = false; activeLoopId++; playIndex = 0;
             document.getElementById('play-btn').innerText = "▶️ Play";
-            let ssBtn = document.getElementById('slideshow-btn'); let shBtn = document.getElementById('shuffle-btn');
+            let ssBtn = document.getElementById('slideshow-btn'), shBtn = document.getElementById('shuffle-btn');
             if (ssBtn && shBtn) {
                 ssBtn.innerText = "🎞️ Slideshow All"; ssBtn.className = "purple"; ssBtn.disabled = false;
                 shBtn.innerText = "🔀 Shuffle All"; shBtn.className = "purple"; shBtn.disabled = false;
@@ -318,11 +413,8 @@
                 }
                 if (playIndex < currentFrames.length) {
                     let frame = currentFrames[playIndex];
-                    frame.forEach((val, i) => {
-                        currentPos[i] = val;
-                        if (i !== 2) { document.getElementById(`s${i}`).value = val; document.getElementById(`v${i}`).innerText = val + "°"; }
-                    });
-                    queueSerialUpdate();
+                    frame.forEach((val, i) => { currentPos[i] = val; });
+                    syncUI(); queueSerialUpdate();
                     playIndex++;
                     let speedMs = parseInt(document.getElementById('frame-speed').value);
                     await new Promise(r => setTimeout(r, speedMs)); 
@@ -338,7 +430,6 @@
             if(activeSlots.length === 0) return alert("Your library is empty! Save some slots first.");
             
             stopPlay(); activeLoopId++; let macroLoopId = activeLoopId; isMacroPlaying = true;
-            
             if (shuffle) {
                 document.getElementById('shuffle-btn').innerText = "⏹️ Stop Shuffle"; document.getElementById('shuffle-btn').className = "danger"; document.getElementById('slideshow-btn').disabled = true;
             } else {
@@ -348,23 +439,20 @@
             while (isMacroPlaying && macroLoopId === activeLoopId) {
                 let playSequence = [...activeSlots];
                 if(shuffle) playSequence.sort(() => Math.random() - 0.5);
-
                 for(let slot of playSequence) {
                     if(!isMacroPlaying || macroLoopId !== activeLoopId) break; 
                     currentFrames = JSON.parse(JSON.stringify(savedAnimations[slot]));
                     document.getElementById('frameCount').innerText = currentFrames.length;
-                    
                     playIndex = 0; isPlaying = true; isPaused = false; document.getElementById('play-btn').innerText = "⏸️ Pause";
                     await playLoop(macroLoopId); 
                     if(!isMacroPlaying || macroLoopId !== activeLoopId) break; 
-
                     let pauseMs = parseInt(document.getElementById('macro-pause').value);
                     await new Promise(r => setTimeout(r, pauseMs));
                 }
             }
         }
 
-        // Storage & Export Logic
+        // --- STORAGE & EXPORT ---
         function updateSlotDropdown() {
             const select = document.getElementById('slotSelect'); select.innerHTML = '';
             for(let i=0; i<15; i++) {
@@ -372,6 +460,7 @@
                 select.innerHTML += `<option value="${i}">Slot ${i+1} (${count > 0 ? count + ' frames' : 'Empty'})</option>`;
             }
         }
+        updateSlotDropdown();
 
         function saveToSlot() {
             if(currentFrames.length === 0) return alert("No active frames to save!");
@@ -387,31 +476,52 @@
             if(!savedAnimations[slot] || savedAnimations[slot].length === 0) return alert("That slot is empty!");
             stopPlay(); currentFrames = JSON.parse(JSON.stringify(savedAnimations[slot]));
             document.getElementById('frameCount').innerText = currentFrames.length;
-            currentFrames[0].forEach((val, i) => {
-                if(i !== 2) { document.getElementById(`s${i}`).value = val; document.getElementById(`v${i}`).innerText = val + "°"; }
-                currentPos[i] = val;
-            });
-            queueSerialUpdate(); alert(`Loaded Slot ${slot+1}!`);
+            currentFrames[0].forEach((val, i) => { currentPos[i] = val; });
+            syncUI(); queueSerialUpdate(); alert(`Loaded Slot ${slot+1}!`);
         }
 
-        function exportAll() { document.getElementById('io-box').value = JSON.stringify(savedAnimations); alert("Exported! Copy the text."); }
+        // Upgraded Export: Now grabs both Slots and Hotkeys
+        function exportAll() { 
+            let exportData = { slots: savedAnimations, hotkeys: savedHotkeys };
+            document.getElementById('io-box').value = JSON.stringify(exportData); 
+            alert("Exported! Copy the text."); 
+        }
 
         let importConflicts = [], pendingImportData = [], currentConflictIndex = 0;
-
+        
+        // Upgraded Import: Handles legacy arrays AND the new dual-save format
         function startImport() {
             try {
-                const data = JSON.parse(document.getElementById('io-box').value);
-                if(!Array.isArray(data) || data.length !== 15) throw new Error("Format");
+                const parsed = JSON.parse(document.getElementById('io-box').value);
+                let importedSlots = [];
+                let importedHotkeys = null;
+
+                // Detect Format
+                if (Array.isArray(parsed) && parsed.length === 15) {
+                    importedSlots = parsed; // Legacy v4 code
+                } else if (parsed.slots && parsed.hotkeys) {
+                    importedSlots = parsed.slots; // New v5.2 code
+                    importedHotkeys = parsed.hotkeys;
+                } else { throw new Error("Format"); }
+
+                // Instantly overwrite hotkeys if they exist in the import
+                if (importedHotkeys) {
+                    savedHotkeys = importedHotkeys;
+                    localStorage.setItem('robotHotkeys', JSON.stringify(savedHotkeys));
+                    renderHotkeys();
+                }
+
+                // Process Slots for conflicts
                 importConflicts = []; pendingImportData = Array(15).fill(null);
                 for(let i=0; i<15; i++) {
-                    let local = savedAnimations[i], imp = data[i];
+                    let local = savedAnimations[i], imp = importedSlots[i];
                     if (imp && imp.length > 0) {
                         if (local && local.length > 0 && JSON.stringify(local) !== JSON.stringify(imp)) importConflicts.push({ slot: i, local: local, imp: imp });
                         else pendingImportData[i] = imp;
                     } else pendingImportData[i] = local;
                 }
                 if (importConflicts.length > 0) { currentConflictIndex = 0; showConflictUI(); } else finishImport();
-            } catch(e) { alert("Invalid code!"); }
+            } catch(e) { alert("Invalid code format!"); }
         }
 
         function showConflictUI() {
@@ -420,7 +530,6 @@
             document.getElementById('conf-local').innerText = conf.local.length; document.getElementById('conf-imp').innerText = conf.imp.length;
             document.getElementById('conflict-modal').style.display = "flex";
         }
-
         function resolveConflict(decision) {
             let conf = importConflicts[currentConflictIndex];
             if (decision === 'local') pendingImportData[conf.slot] = conf.local;
@@ -429,10 +538,8 @@
             currentConflictIndex++;
             if (currentConflictIndex < importConflicts.length) showConflictUI(); else { document.getElementById('conflict-modal').style.display = "none"; finishImport(); }
         }
-
         function cancelImport() { document.getElementById('conflict-modal').style.display = "none"; alert("Import cancelled."); }
         function finishImport() { savedAnimations = pendingImportData; localStorage.setItem('robotAnims', JSON.stringify(savedAnimations)); updateSlotDropdown(); alert("Import complete!"); }
     </script>
 </body>
 </html>
-
