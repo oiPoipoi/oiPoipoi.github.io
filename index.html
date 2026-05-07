@@ -315,7 +315,7 @@
             if (e.key === 'ArrowRight') { currentPos[4] = Math.min(180, currentPos[4] + 5); changed = true; e.preventDefault();} // Wrist Pitch Up
             if (key === 'q') { currentPos[5] = Math.max(0, currentPos[5] - 5); changed = true; } // Wrist Roll Left
             if (key === 'e') { currentPos[5] = Math.min(180, currentPos[5] + 5); changed = true; } // Wrist Roll Right
-            if (key === ' ') { currentPos[6] = (currentPos[6] >= 0) ? 90 : 0; changed = true; e.preventDefault(); }
+            if (key === ' ') { currentPos[6] = (currentPos[6] >= 180) ? 0 : 180; changed = true; e.preventDefault(); }
             if (key === 'f') { saveFrame(); e.preventDefault(); }
             
             if (key >= '0' && key <= '9') {
