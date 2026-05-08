@@ -416,6 +416,7 @@
         // --- USB CONNECTION & AUTO RECONNECT ---
         let autoReconnectInterval = null;
         let shouldAutoReconnect = true;
+        let lastSentData = ""; // NEW: Stores the last packet to prevent spamming the Arduino
 
         document.getElementById('connect').onclick = async () => {
             try {
@@ -481,10 +482,17 @@
                             let adjusted = Math.round(val) + calibrationOffsets[i];
                             return Math.max(0, Math.min(180, adjusted)); 
                         });
-                        await writer.write(new TextEncoder().encode(`ALL:${outputPos.join(',')}\n`));
+                        
+                        let outStr = `ALL:${outputPos.join(',')}\n`;
+                        
+                        // NEW: Only send data if it actually changed to prevent 9600 baud buffer overflow
+                        if (outStr !== lastSentData) {
+                            await writer.write(new TextEncoder().encode(outStr));
+                            lastSentData = outStr;
+                        }
                     } catch(e) { console.error("Failed to write to port."); }
                     serialTimeout = null;
-                }, 40); 
+                }, 80); // INCREASED: from 40ms to 80ms giving the Arduino time to digest the data
             }
         }
 
@@ -607,6 +615,7 @@
 
         // --- WIIMOTE INTEGRATION ---
         let wiimote = null, isWiiCalibrated = false, wiiCalib = {x: 128, y: 128, z: 128}, gripperClosed = false, lastWiiB = false;
+        let smoothX = 128, smoothY = 128; // NEW: Wiimote shock absorbers
 
         async function connectWiimote() {
             if (!navigator.hid) return customAlert("WebHID not supported in this browser.", "Error");
@@ -647,7 +656,12 @@
             if (btnA) { document.getElementById('wii-status').innerText = "Status: PAUSED"; document.getElementById('wii-status').style.color = "#f38ba8"; return; } 
             else { document.getElementById('wii-status').innerText = "Status: Active!"; document.getElementById('wii-status').style.color = "#a6e3a1"; }
 
-            let pitch = 90 + ((ay - wiiCalib.y) * 3), roll = 90 - ((ax - wiiCalib.x) * 3);  
+            // NEW: Exponential Moving Average filter to kill the hand shakes
+            const filterSpeed = 0.15;
+            smoothX = (ax * filterSpeed) + (smoothX * (1 - filterSpeed));
+            smoothY = (ay * filterSpeed) + (smoothY * (1 - filterSpeed));
+
+            let pitch = 90 + ((smoothY - wiiCalib.y) * 3), roll = 90 - ((smoothX - wiiCalib.x) * 3);  
             pitch = Math.max(0, Math.min(180, Math.round(pitch))); roll = Math.max(0, Math.min(180, Math.round(roll)));
 
             if (targetPos[1] !== pitch || targetPos[0] !== roll) {
@@ -765,8 +779,15 @@
         }
 
         // --- DEMO MODE (ENCRYPTION & LOCK) ---
-        let isDemoMode = false;
-        let demoLockCode = "";
+        let demoLockCode = localStorage.getItem('robotDemoLock') || "";
+        let isDemoMode = !!demoLockCode;
+
+        // Auto-lock if the system was locked before refresh
+        if (isDemoMode) {
+            document.getElementById('demo-overlay').style.display = 'flex';
+            // Slight delay to ensure everything is loaded before macro starts
+            window.addEventListener('load', () => setTimeout(() => toggleMacro(true), 500));
+        }
 
         function startDemoMode() {
             let pin = document.getElementById('demo-pin-input').value;
@@ -774,6 +795,7 @@
             
             // "Encryption" (Base64 + Salt)
             demoLockCode = btoa(encodeURIComponent("RBT_" + pin)); 
+            localStorage.setItem('robotDemoLock', demoLockCode);
             
             isDemoMode = true;
             document.getElementById('demo-overlay').style.display = 'flex';
@@ -791,6 +813,7 @@
             if (encodedAttempt === demoLockCode) {
                 isDemoMode = false;
                 demoLockCode = "";
+                localStorage.removeItem('robotDemoLock');
                 document.getElementById('demo-overlay').style.display = 'none';
                 document.getElementById('demo-pin-input').value = "";
                 stopPlay();
@@ -830,12 +853,22 @@
         function startImport() {
             try {
                 const parsed = JSON.parse(document.getElementById('io-box').value);
-                let importedSlots = [], importedHotkeys = null, importedCalib = null;
+                let importedSlots = [], importedHotkeys = null, importedCalib = null, importedDemoLock = null;
 
                 if (Array.isArray(parsed) && parsed.length === 15) { importedSlots = parsed; } 
                 else if (parsed.slots && parsed.hotkeys) {
                     importedSlots = parsed.slots; importedHotkeys = parsed.hotkeys; importedCalib = parsed.calib;
+                    if (parsed.demoLock) importedDemoLock = parsed.demoLock;
                 } else { throw new Error("Format"); }
+
+                if (importedDemoLock) {
+                    demoLockCode = importedDemoLock;
+                    localStorage.setItem('robotDemoLock', demoLockCode);
+                    isDemoMode = true;
+                    document.getElementById('demo-overlay').style.display = 'flex';
+                    setTimeout(() => toggleMacro(true), 500);
+                    customAlert("System locked from imported data.", "Demo Mode Active");
+                }
 
                 if (importedHotkeys) {
                     savedHotkeys = importedHotkeys.map((hk, i) => {
