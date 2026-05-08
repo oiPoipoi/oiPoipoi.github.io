@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Robot Arm Controller</title>
+    <style>
+        /* Restored Original Theme */
+        body { font-family: sans-serif; background: #1e1e2e; color: #cdd6f4; text-align: center; padding: 20px; margin: 0; }
+        .card { background: #313244; padding: 25px; border-radius: 12px; display: inline-block; max-width: 850px; width: 100%; box-shadow: 0 8px 16px rgba(0,0,0,0.6); }
+        h2, h3 { margin-top: 0; color: #89b4fa; }
+        
+        /* Collapsibles */
+        details { background: #181825; margin-bottom: 15px; border-radius: 8px; border: 1px solid #585b70; overflow: hidden; text-align: left; }
+        summary { padding: 15px; cursor: pointer; outline: none; list-style: none; font-weight: bold; color: #cba6f7; display: flex; align-items: center; }
+        summary::-webkit-details-marker { display: none; }
+        summary h3 { margin: 0; font-size: 1.1em; flex-grow: 1; }
+        summary::before { content: "▶"; color: #89b4fa; margin-right: 10px; font-size: 1.2em; transition: 0.3s; }
+        details[open] summary::before { transform: rotate(90deg); color: #a6e3a1; }
+        .details-content { padding: 0 15px 15px 15px; text-align: center; }
+
+        /* Sliders & Inputs */
+        .slider-container { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; background: #45475a; padding: 10px; border-radius: 8px; }
+        input[type=range] { flex-grow: 1; margin: 0 15px; cursor: pointer; }
+        .calib-input { width: 50px; padding: 4px; background: #11111b; color: #a6e3a1; border: 1px solid #585b70; border-radius: 4px; text-align: center; font-weight: bold; }
+
+        /* Buttons */
+        button { padding: 8px 12px; margin: 4px; cursor: pointer; border-radius: 6px; border: none; background: #89b4fa; color: #11111b; font-weight: bold; transition: 0.2s; text-transform: uppercase; font-size: 0.85em; }
+        button:hover:not(:disabled) { background: #b4befe; transform: translateY(-1px); }
+        button:disabled { background: #585b70; color: #a6adc8; cursor: not-allowed; opacity: 0.7; }
+        
+        .success { background: #a6e3a1; } .success:hover:not(:disabled) { background: #94e2d5; }
+        .danger { background: #f38ba8; } .danger:hover:not(:disabled) { background: #eba0ac; }
+        .warning { background: #f9e2af; } .warning:hover:not(:disabled) { background: #f5e0dc; }
+        .purple { background: #cba6f7; } .purple:hover:not(:disabled) { background: #b4befe; }
+
+        /* Keyboard Hints */
+        .keyboard-hint { font-size: 0.85em; color: #a6adc8; margin: 15px 0; background: #181825; padding: 10px; border-radius: 8px; line-height: 1.8;}
+        kbd { background: #11111b; border: 1px solid #585b70; padding: 2px 6px; border-radius: 4px; color: #a6e3a1; font-family: monospace; font-weight: bold;}
+        
+        /* Renameable Hotkeys */
+        .hotkey-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 10px;}
+        .hotkey-slot { background: #313244; padding: 8px; border-radius: 8px; border: 1px solid #585b70; display: flex; flex-direction: column; gap: 5px;}
+        .hotkey-slot.active { border-color: #a6e3a1; background: #45475a;}
+        .hotkey-name { background: transparent; border: none; color: #89b4fa; font-weight: bold; text-align: center; font-size: 0.85em; outline: none; width: 100%; border-bottom: 1px dashed #585b70; padding-bottom: 2px;}
+        .hotkey-name:focus { border-bottom: 1px solid #a6e3a1; }
+
+        /* General Layout */
+        textarea { width: 90%; height: 60px; margin-top: 10px; background: #11111b; color: #a6e3a1; border: 1px solid #585b70; padding: 10px; font-family: monospace; border-radius: 6px; resize: vertical; }
+        select { padding: 8px; border-radius: 6px; background: #11111b; color: #cdd6f4; border: 1px solid #cba6f7; font-weight: bold; }
+        .controls-row { display: flex; justify-content: center; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;}
+        
+        /* Modal */
+        #conflict-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #181825; border: 2px solid #f38ba8; padding: 30px; border-radius: 12px; text-align: left; max-width: 400px; }
+        .modal-buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+
+        /* Top Bar Info */
+        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #181825; padding: 10px 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #585b70; }
+        .safety-toggle { display: flex; align-items: center; gap: 8px; color: #f9e2af; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="conflict-modal">
+        <div class="modal-content">
+            <h3 style="color:#f38ba8; margin-bottom:10px;">⚠️ Import Conflict</h3>
+            <p id="conflict-text" style="font-weight:bold; color:#f9e2af;">Slot X has conflicting data.</p>
+            <p><strong>🏠 Local Version:</strong> <span id="conf-local" style="color:#a6e3a1;">0</span> frames</p>
+            <p><strong>☁️ Import Version:</strong> <span id="conf-imp" style="color:#89b4fa;">0</span> frames</p>
+            <div class="modal-buttons">
+                <button class="success" onclick="resolveConflict('local')">🏠 Keep Local</button>
+                <button class="danger" onclick="resolveConflict('import')">⬇️ Overwrite</button>
+                <button class="purple" onclick="resolveConflict('merge')">🔗 Merge</button>
+                <button onclick="cancelImport()" style="background:#585b70; color:white; margin-top:10px;">❌ Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🤖 Robot Arm Controller</h2>
+        
+        <div class="top-bar">
+            <div style="text-align:left;">
+                <button id="connect" class="success" style="margin:0;">🔌 Connect USB</button>
+                <button id="cancel-reconnect-btn" class="danger" style="display:none; margin:0;" onclick="cancelReconnect()">❌ Stop Auto-Reconnect</button>
+                <div id="status" style="color: #a6adc8; font-weight: bold; font-size: 0.85em; margin-top:5px;">Arduino: Offline</div>
+            </div>
+            
+            <label class="safety-toggle">
+                <input type="checkbox" id="safety-limit" checked onchange="updateSafetyUI()"> 
+                🛡️ Speed Limiter (Safety)
+            </label>
+        </div>
+
+        <div id="sliders" style="margin-bottom: 20px;"></div>
+
+        <div class="keyboard-hint">
+            <strong>🎮 KEYBOARD / GAMEPAD CONTROLS:</strong><br>
+            <span id="gamepad-status" style="color: #cba6f7; font-weight:bold;">Gamepad: Disconnected (Press any button to wake)</span><br>
+            <kbd>W</kbd> <kbd>S</kbd> = Elbow | <kbd>A</kbd> <kbd>D</kbd> = Base | <kbd>↑</kbd> <kbd>↓</kbd> = Shoulder<br>
+            <kbd>←</kbd> <kbd>→</kbd> = Wrist Pitch | <kbd>Q</kbd> <kbd>E</kbd> = Wrist Roll | <kbd>SPACE</kbd> = Grip | <kbd>F</kbd> = Save Pose
+        </div>
+
+        <details open>
+            <summary><h3>⚡ Quick-Pose Hotkeys (<kbd>1</kbd> - <kbd>0</kbd>)</h3></summary>
+            <div class="details-content">
+                <p style="font-size: 0.8em; color: #a6adc8; margin: 0;">Click names to rename. Keys <kbd>1</kbd> to <kbd>0</kbd> trigger poses instantly.</p>
+                <div class="hotkey-grid" id="hotkey-grid"></div>
+            </div>
+        </details>
+
+        <details>
+            <summary><h3>🔧 Hardware Calibration</h3></summary>
+            <div class="details-content">
+                <p style="font-size: 0.8em; color: #a6adc8; margin-top: 0;">Offset degrees if servos are physically misaligned. Does not affect saved animations.</p>
+                <div class="controls-row" id="calib-inputs">
+                    </div>
+                <button class="warning" onclick="resetCalibration()">Reset to 0</button>
+            </div>
+        </details>
+
+        <details>
+            <summary><h3>🕹️ Wiimote Integration</h3></summary>
+            <div class="details-content">
+                <button id="wii-connect" class="purple" onclick="connectWiimote()">📡 Sync Wiimote</button>
+                <p id="wii-status" style="color: #a6adc8; font-weight: bold; margin-bottom: 0;">Status: Disconnected</p>
+                <p id="wii-instructions" style="font-size: 0.85em; color: #f9e2af; display: none;">
+                    <strong>CALIBRATE:</strong> Hold flat, press <b>+</b> | <strong>GRIP:</strong> Press <b>B</b> | <strong>PAUSE:</strong> Hold <b>A</b>
+                </p>
+            </div>
+        </details>
+        
+        <details>
+            <summary><h3>🎬 Animation & Playback</h3></summary>
+            <div class="details-content">
+                <button class="success" onclick="saveFrame()">➕ Save Pose to Frame</button>
+                <button class="danger" onclick="clearFrames()">🗑️ Clear Frames</button>
+                <p>Active Frames: <span id="frameCount" style="font-weight:bold; color:#a6e3a1; font-size: 1.2em;">0</span></p>
+                
+                <div class="controls-row" style="background: #181825; padding: 15px; border-radius: 8px;">
+                    <button id="play-btn" class="success" onclick="togglePlay()">▶️ Play</button>
+                    <button class="danger" onclick="stopPlay()">⏹️ Stop</button>
+                    <label style="margin-left: 10px; cursor: pointer; font-weight: bold;">
+                        <input type="checkbox" id="loop-toggle"> 🔁 Loop Current
+                    </label>
+                </div>
+
+                <div class="controls-row" style="background: #181825; padding: 15px; border-radius: 8px; margin-top: 10px;">
+                    <div style="display: flex; flex-direction: column; align-items: center; width: 45%;">
+                        <label style="font-weight: bold; color: #89b4fa; margin-bottom: 5px;">Frame Speed: <span id="speed-val">600</span>ms</label>
+                        <input type="range" id="frame-speed" min="100" max="2000" step="50" value="600" oninput="document.getElementById('speed-val').innerText = this.value">
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; width: 45%;">
+                        <label style="font-weight: bold; color: #cba6f7; margin-bottom: 5px;">Macro Pause: <span id="pause-val">1.0</span>s</label>
+                        <input type="range" id="macro-pause" min="0" max="5000" step="100" value="1000" oninput="document.getElementById('pause-val').innerText = (this.value/1000).toFixed(1)">
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        <details>
+            <summary><h3>💾 Library & Macros</h3></summary>
+            <div class="details-content">
+                <div class="controls-row">
+                    <select id="slotSelect"></select>
+                    <button class="success" onclick="saveToSlot()">💾 Save to Slot</button>
+                    <button class="warning" onclick="loadFromSlot()">📂 Load Slot</button>
+                </div>
+                <div class="controls-row" style="margin-top:15px;">
+                    <button id="slideshow-btn" class="purple" onclick="toggleMacro(false)">🎞️ Slideshow All</button>
+                    <button id="shuffle-btn" class="purple" onclick="toggleMacro(true)">🔀 Shuffle All</button>
+                </div>
+            </div>
+        </details>
+        
+        <details>
+            <summary><h3>📦 Backup & Restore</h3></summary>
+            <div class="details-content">
+                <button onclick="exportAll()">⬇️ Export Slots & Hotkeys</button>
+                <button onclick="startImport()" class="warning">⬆️ Import & Merge</button>
+                <textarea id="io-box" placeholder="Exported code will appear here. Paste code here to import."></textarea>
+            </div>
+        </details>
+    </div>
+
+    <script>
+        let port, writer;
+        let currentPos = [90, 90, 90, 90, 90, 90, 90]; // Internal UI logic (0-180)
+        let calibrationOffsets = JSON.parse(localStorage.getItem('robotCalibration')) || [0, 0, 0, 0, 0, 0, 0];
+        let currentFrames = [];
+        
+        let savedAnimations = JSON.parse(localStorage.getItem('robotAnims')) || Array(15).fill(null);
+        let savedHotkeys = JSON.parse(localStorage.getItem('robotHotkeysV2')) || Array(10).fill(null);
+
+        const servoNames = ['Base', 'Shoulder', 'Hidden', 'Elbow', 'W-Pitch', 'W-Roll', 'Gripper'];
+
+        // --- UI MASTER SYNC ---
+        function syncUI() {
+            for(let i=0; i<7; i++) {
+                if(i === 2) continue;
+                if(document.getElementById(`s${i}`)) document.getElementById(`s${i}`).value = currentPos[i];
+                if(document.getElementById(`v${i}`)) document.getElementById(`v${i}`).innerText = currentPos[i] + "°";
+            }
+        }
+
+        // Generate Slider UI
+        const sliderDiv = document.getElementById('sliders');
+        for(let i=0; i<7; i++) {
+            if(i === 2) continue;
+            // Note: Gripper logic will stay 0-180 in the math/sliders, but snap to 0/90 on button press
+            sliderDiv.innerHTML += `
+                <div class="slider-container">
+                    <span style="width: 140px; text-align: left; font-weight:bold; font-size:0.9em;">${servoNames[i]} [${i}]</span>
+                    <input type="range" id="s${i}" min="0" max="180" value="90" oninput="manualSliderUpdate(${i}, this.value)">
+                    <span id="v${i}" style="width:45px; text-align:right; font-weight:bold; color:#89b4fa;">90°</span>
+                </div>`;
+        }
+
+        function manualSliderUpdate(index, value) {
+            currentPos[index] = parseInt(value);
+            syncUI(); queueSerialUpdate(); 
+        }
+
+        function updateSafetyUI() {
+            const isSafe = document.getElementById('safety-limit').checked;
+            document.querySelector('.safety-toggle').style.color = isSafe ? "#a6e3a1" : "#f38ba8";
+        }
+        updateSafetyUI();
+
+        // --- CALIBRATION UI ---
+        const calibDiv = document.getElementById('calib-inputs');
+        for(let i=0; i<7; i++) {
+            if(i === 2) continue;
+            calibDiv.innerHTML += `
+                <div style="display:flex; flex-direction:column; align-items:center;">
+                    <label style="font-size:0.75em; color:#89b4fa;">[${i}]</label>
+                    <input type="number" id="c${i}" class="calib-input" value="${calibrationOffsets[i]}" onchange="updateCalibration(${i}, this.value)">
+                </div>
+            `;
+        }
+
+        function updateCalibration(index, value) {
+            calibrationOffsets[index] = parseInt(value) || 0;
+            localStorage.setItem('robotCalibration', JSON.stringify(calibrationOffsets));
+            queueSerialUpdate(); // Immediately send new offset to robot
+        }
+
+        function resetCalibration() {
+            calibrationOffsets = [0,0,0,0,0,0,0];
+            for(let i=0; i<7; i++) { if(i!==2) document.getElementById(`c${i}`).value = 0; }
+            localStorage.setItem('robotCalibration', JSON.stringify(calibrationOffsets));
+            queueSerialUpdate();
+        }
+
+        // --- USB CONNECTION & AUTO RECONNECT ---
+        let autoReconnectInterval = null;
+        let shouldAutoReconnect = true;
+
+        document.getElementById('connect').onclick = async () => {
+            try {
+                shouldAutoReconnect = true;
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                writer = port.writable.getWriter();
+                updateStatusConnected();
+            } catch (err) { alert("Connection failed! Check OS permissions."); }
+        };
+
+        function updateStatusConnected() {
+            document.getElementById('status').innerText = "Arduino: SYSTEM ONLINE";
+            document.getElementById('status').style.color = "#a6e3a1";
+            document.getElementById('connect').style.display = "none";
+            document.getElementById('cancel-reconnect-btn').style.display = "none";
+        }
+
+        navigator.serial.addEventListener("disconnect", (event) => {
+            if (port && event.target === port) {
+                document.getElementById('status').innerText = "Arduino: DISCONNECTED. Auto-reconnecting...";
+                document.getElementById('status').style.color = "#f38ba8";
+                document.getElementById('cancel-reconnect-btn').style.display = "inline-block";
+                port = null; writer = null;
+                if (shouldAutoReconnect) attemptReconnect();
+            }
+        });
+
+        async function attemptReconnect() {
+            if (autoReconnectInterval) return;
+            autoReconnectInterval = setInterval(async () => {
+                if (!shouldAutoReconnect) { clearInterval(autoReconnectInterval); autoReconnectInterval = null; return; }
+                try {
+                    const ports = await navigator.serial.getPorts();
+                    if (ports.length > 0) {
+                        port = ports[0];
+                        await port.open({ baudRate: 9600 });
+                        writer = port.writable.getWriter();
+                        clearInterval(autoReconnectInterval); autoReconnectInterval = null;
+                        updateStatusConnected();
+                    }
+                } catch(e) { }
+            }, 2000);
+        }
+
+        function cancelReconnect() {
+            shouldAutoReconnect = false;
+            if (autoReconnectInterval) clearInterval(autoReconnectInterval);
+            autoReconnectInterval = null;
+            document.getElementById('status').innerText = "Arduino: Offline";
+            document.getElementById('status').style.color = "#a6adc8";
+            document.getElementById('cancel-reconnect-btn').style.display = "none";
+            document.getElementById('connect').style.display = "inline-block";
+        }
+
+        // --- USB SENDER (With Calibration Applied) ---
+        let serialTimeout = null;
+        async function queueSerialUpdate() {
+            if (!serialTimeout && writer) {
+                serialTimeout = setTimeout(async () => {
+                    try {
+                        // Apply calibration math ONLY to outgoing data
+                        let outputPos = currentPos.map((val, i) => {
+                            let adjusted = val + calibrationOffsets[i];
+                            return Math.max(0, Math.min(180, adjusted)); // Keep within hardware limits
+                        });
+                        await writer.write(new TextEncoder().encode(`ALL:${outputPos.join(',')}\n`));
+                    } catch(e) { console.error("Failed to write to port."); }
+                    serialTimeout = null;
+                }, 50); 
+            }
+        }
+
+        // --- KEYBOARD CONTROLS ---
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; 
+            const key = e.key.toLowerCase();
+            let changed = false;
+            
+            // Speed Limiter Toggle
+            let step = document.getElementById('safety-limit').checked ? 1 : 5;
+
+            if (key === 'w') { currentPos[3] = Math.max(0, currentPos[3] - step); changed = true; } // Elbow Up
+            if (key === 's') { currentPos[3] = Math.min(180, currentPos[3] + step); changed = true; } // Elbow Down
+            if (key === 'a') { currentPos[0] = Math.min(180, currentPos[0] + step); changed = true; } // Base Left
+            if (key === 'd') { currentPos[0] = Math.max(0, currentPos[0] - step); changed = true; } // Base Right
+            if (e.key === 'ArrowUp') { currentPos[1] = Math.max(0, currentPos[1] - step); changed = true; e.preventDefault();} // Shoulder Up
+            if (e.key === 'ArrowDown') { currentPos[1] = Math.min(180, currentPos[1] + step); changed = true; e.preventDefault();} // Shoulder Down
+            if (e.key === 'ArrowLeft') { currentPos[4] = Math.max(0, currentPos[4] - step); changed = true; e.preventDefault();} // Wrist Pitch Down
+            if (e.key === 'ArrowRight') { currentPos[4] = Math.min(180, currentPos[4] + step); changed = true; e.preventDefault();} // Wrist Pitch Up
+            if (key === 'q') { currentPos[5] = Math.max(0, currentPos[5] - step); changed = true; } // Wrist Roll Left
+            if (key === 'e') { currentPos[5] = Math.min(180, currentPos[5] + step); changed = true; } // Wrist Roll Right
+            
+            // GRIPPER TOGGLE (0 to 90 now)
+            if (key === ' ') { currentPos[6] = (currentPos[6] >= 45) ? 0 : 90; changed = true; e.preventDefault(); }
+            
+            if (key === 'f') { saveFrame(); e.preventDefault(); }
+            if (key >= '0' && key <= '9') { let idx = key === '0' ? 9 : parseInt(key) - 1; goHotkey(idx); }
+
+            if (changed) { syncUI(); queueSerialUpdate(); }
+        });
+
+        // --- NATIVE GAMEPAD SUPPORT ---
+        let gamepadIndex = null;
+        let lastGpGrip = false;
+        let lastGpSave = false;
+
+        window.addEventListener("gamepadconnected", (e) => {
+            gamepadIndex = e.gamepad.index;
+            document.getElementById('gamepad-status').innerText = `Gamepad: ${e.gamepad.id}`;
+            document.getElementById('gamepad-status').style.color = "#a6e3a1";
+            requestAnimationFrame(pollGamepad);
+        });
+
+        window.addEventListener("gamepaddisconnected", (e) => {
+            if (e.gamepad.index === gamepadIndex) gamepadIndex = null;
+            document.getElementById('gamepad-status').innerText = "Gamepad: Disconnected";
+            document.getElementById('gamepad-status').style.color = "#f38ba8";
+        });
+
+        function pollGamepad() {
+            if (gamepadIndex === null) return;
+            const gp = navigator.getGamepads()[gamepadIndex];
+            if (!gp) return;
+            
+            let changed = false;
+            // Gamepad polls at 60hz. Steps must be very small if safety is on.
+            let step = document.getElementById('safety-limit').checked ? 0.5 : 2;
+            const deadzone = 0.15;
+
+            // Joysticks
+            if (Math.abs(gp.axes[1]) > deadzone) { currentPos[3] += gp.axes[1] * step; changed = true; } // Left Y: Elbow
+            if (Math.abs(gp.axes[0]) > deadzone) { currentPos[0] += gp.axes[0] * step; changed = true; } // Left X: Base
+            if (Math.abs(gp.axes[3]) > deadzone) { currentPos[1] += gp.axes[3] * step; changed = true; } // Right Y: Shoulder
+            if (Math.abs(gp.axes[2]) > deadzone) { currentPos[4] -= gp.axes[2] * step; changed = true; } // Right X: W-Pitch
+            
+            // D-Pad L/R for Wrist Roll (Buttons 14 & 15 standard mapping)
+            if (gp.buttons[14] && gp.buttons[14].pressed) { currentPos[5] -= step; changed = true; }
+            if (gp.buttons[15] && gp.buttons[15].pressed) { currentPos[5] += step; changed = true; }
+
+            // Gripper Toggle (A / Cross Button -> Button 0)
+            if (gp.buttons[0] && gp.buttons[0].pressed && !lastGpGrip) {
+                currentPos[6] = (currentPos[6] >= 45) ? 0 : 90; // 0 to 90 logic
+                changed = true;
+            }
+            lastGpGrip = gp.buttons[0] ? gp.buttons[0].pressed : false;
+
+            // Save Frame (B / Circle Button -> Button 1)
+            if (gp.buttons[1] && gp.buttons[1].pressed && !lastGpSave) {
+                saveFrame();
+            }
+            lastGpSave = gp.buttons[1] ? gp.buttons[1].pressed : false;
+
+            if (changed) {
+                // Apply bounds before UI sync
+                for(let i=0; i<7; i++) currentPos[i] = Math.max(0, Math.min(180, currentPos[i]));
+                syncUI(); queueSerialUpdate();
+            }
+            requestAnimationFrame(pollGamepad);
+        }
+
+        // --- RENAMEABLE QUICK-POSE HOTKEYS ---
+        function renderHotkeys() {
+            const grid = document.getElementById('hotkey-grid');
+            grid.innerHTML = '';
+            for(let i=0; i<10; i++) {
+                let keyNum = i === 9 ? 0 : i + 1;
+                let data = savedHotkeys[i] || { name: `Pose ${keyNum}`, pos: null };
+                let hasData = data.pos !== null;
+                
+                grid.innerHTML += `
+                    <div class="hotkey-slot ${hasData ? 'active' : ''}">
+                        <div style="font-size: 0.7em; color: #a6adc8; text-align:left;">KEY [${keyNum}]</div>
+                        <input type="text" class="hotkey-name" value="${data.name}" onchange="updateHotkeyName(${i}, this.value)">
+                        <div style="display:flex; gap: 5px; margin-top:5px;">
+                            <button class="success" style="flex: 1; padding: 4px; font-size: 0.7em;" onclick="setHotkey(${i})">SET</button>
+                            <button class="purple" style="flex: 1; padding: 4px; font-size: 0.7em;" onclick="goHotkey(${i})" ${hasData ? '' : 'disabled'}>GO</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        renderHotkeys();
+
+        function updateHotkeyName(index, newName) {
+            if (!savedHotkeys[index]) savedHotkeys[index] = { name: newName, pos: null };
+            else savedHotkeys[index].name = newName;
+            localStorage.setItem('robotHotkeysV2', JSON.stringify(savedHotkeys));
+        }
+
+        function setHotkey(index) {
+            let currentName = savedHotkeys[index] ? savedHotkeys[index].name : `Pose ${index+1}`;
+            savedHotkeys[index] = { name: currentName, pos: [...currentPos] };
+            localStorage.setItem('robotHotkeysV2', JSON.stringify(savedHotkeys));
+            renderHotkeys();
+        }
+
+        function goHotkey(index) {
+            if (savedHotkeys[index] && savedHotkeys[index].pos) {
+                currentPos = [...savedHotkeys[index].pos];
+                syncUI(); queueSerialUpdate();
+            }
+        }
+
+        // --- WIIMOTE INTEGRATION ---
+        let wiimote = null;
+        let isWiiCalibrated = false;
+        let wiiCalib = {x: 128, y: 128, z: 128}; 
+        let gripperClosed = false;
+        let lastB = false;
+
+        async function connectWiimote() {
+            if (!navigator.hid) return alert("WebHID not supported.");
+            try {
+                const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x057e }] });
+                if (devices.length > 0) {
+                    wiimote = devices[0]; await wiimote.open();
+                    await wiimote.sendReport(0x12, new Uint8Array([0x00, 0x31]));
+                    wiimote.addEventListener('inputreport', handleWiiData);
+                    document.getElementById('wii-status').innerText = "Status: Waiting for Calibration (+)";
+                    document.getElementById('wii-status').style.color = "#f9e2af";
+                    document.getElementById('wii-instructions').style.display = "block";
+                    document.getElementById('wii-connect').style.display = "none";
+                }
+            } catch (err) { alert("Wiimote connection failed."); }
+        }
+
+        function handleWiiData(event) {
+            if (event.reportId !== 0x31) return; 
+            const data = event.data, btn0 = data.getUint8(0), btn1 = data.getUint8(1);
+            const btnA = (btn1 & 0x08) !== 0, btnB = (btn1 & 0x04) !== 0, btnPlus = (btn0 & 0x10) !== 0;
+            const ax = data.getUint8(2), ay = data.getUint8(3), az = data.getUint8(4);
+
+            if (btnPlus) {
+                wiiCalib = {x: ax, y: ay, z: az}; isWiiCalibrated = true;
+                document.getElementById('wii-status').innerText = "Status: Calibrated & Active!";
+                document.getElementById('wii-status').style.color = "#a6e3a1";
+            }
+            if (!isWiiCalibrated) return;
+
+            // GRIPPER: 0 to 90
+            if (btnB && !lastB) {
+                gripperClosed = !gripperClosed;
+                currentPos[6] = gripperClosed ? 90 : 0;
+                syncUI(); queueSerialUpdate();
+            }
+            lastB = btnB;
+
+            if (btnA) {
+                document.getElementById('wii-status').innerText = "Status: PAUSED (Moving Freely)";
+                document.getElementById('wii-status').style.color = "#f38ba8";
+                return;
+            } else {
+                document.getElementById('wii-status').innerText = "Status: Calibrated & Active!";
+                document.getElementById('wii-status').style.color = "#a6e3a1";
+            }
+
+            let pitch = 90 + ((ay - wiiCalib.y) * 3); 
+            let roll = 90 - ((ax - wiiCalib.x) * 3);  
+            pitch = Math.max(0, Math.min(180, Math.round(pitch)));
+            roll = Math.max(0, Math.min(180, Math.round(roll)));
+
+            if (currentPos[1] !== pitch || currentPos[0] !== roll) {
+                currentPos[1] = pitch; currentPos[0] = roll;
+                syncUI(); queueSerialUpdate();
+            }
+        }
+
+        // --- ANIMATION / MACRO LOGIC ---
+        function saveFrame() {
+            currentFrames.push([...currentPos]);
+            document.getElementById('frameCount').innerText = currentFrames.length;
+        }
+        function clearFrames() {
+            stopPlay(); currentFrames = [];
+            document.getElementById('frameCount').innerText = "0";
+        }
+
+        let isPlaying = false, isPaused = false, playIndex = 0, isMacroPlaying = false, activeLoopId = 0;
+        
+        async function togglePlay() {
+            if (currentFrames.length === 0) return alert("Add some frames first!");
+            if (!isPlaying) {
+                isPlaying = true; isPaused = false; activeLoopId++;
+                document.getElementById('play-btn').innerText = "⏸️ Pause";
+                playLoop(activeLoopId);
+            } else if (!isPaused) {
+                isPaused = true; document.getElementById('play-btn').innerText = "▶️ Resume";
+            } else {
+                isPaused = false; document.getElementById('play-btn').innerText = "⏸️ Pause";
+            }
+        }
+
+        function stopPlay() {
+            isPlaying = false; isPaused = false; isMacroPlaying = false; activeLoopId++; playIndex = 0;
+            document.getElementById('play-btn').innerText = "▶️ Play";
+            let ssBtn = document.getElementById('slideshow-btn'), shBtn = document.getElementById('shuffle-btn');
+            if (ssBtn && shBtn) {
+                ssBtn.innerText = "🎞️ Slideshow All"; ssBtn.className = "purple"; ssBtn.disabled = false;
+                shBtn.innerText = "🔀 Shuffle All"; shBtn.className = "purple"; shBtn.disabled = false;
+            }
+        }
+
+        async function playLoop(loopId) {
+            while (isPlaying && loopId === activeLoopId) {
+                if (isPaused) { await new Promise(r => setTimeout(r, 100)); continue; }
+                if (playIndex >= currentFrames.length) {
+                    if (document.getElementById('loop-toggle').checked && !isMacroPlaying) playIndex = 0; 
+                    else break; 
+                }
+                if (playIndex < currentFrames.length) {
+                    let frame = currentFrames[playIndex];
+                    frame.forEach((val, i) => { currentPos[i] = val; });
+                    syncUI(); queueSerialUpdate();
+                    playIndex++;
+                    
+                    let baseSpeed = parseInt(document.getElementById('frame-speed').value);
+                    let safeDelay = document.getElementById('safety-limit').checked ? Math.max(baseSpeed, 800) : baseSpeed; // Min 800ms between frames in safety mode
+                    await new Promise(r => setTimeout(r, safeDelay)); 
+                }
+            }
+            if(!isMacroPlaying && loopId === activeLoopId) stopPlay();
+        }
+
+        async function toggleMacro(shuffle) {
+            if(isMacroPlaying) { stopPlay(); return; }
+            let activeSlots = [];
+            for(let i=0; i<15; i++) if(savedAnimations[i] && savedAnimations[i].length > 0) activeSlots.push(i);
+            if(activeSlots.length === 0) return alert("Your library is empty! Save some slots first.");
+            
+            stopPlay(); activeLoopId++; let macroLoopId = activeLoopId; isMacroPlaying = true;
+            if (shuffle) {
+                document.getElementById('shuffle-btn').innerText = "⏹️ Stop Shuffle"; document.getElementById('shuffle-btn').className = "danger"; document.getElementById('slideshow-btn').disabled = true;
+            } else {
+                document.getElementById('slideshow-btn').innerText = "⏹️ Stop Slideshow"; document.getElementById('slideshow-btn').className = "danger"; document.getElementById('shuffle-btn').disabled = true;
+            }
+
+            while (isMacroPlaying && macroLoopId === activeLoopId) {
+                let playSequence = [...activeSlots];
+                if(shuffle) playSequence.sort(() => Math.random() - 0.5);
+                for(let slot of playSequence) {
+                    if(!isMacroPlaying || macroLoopId !== activeLoopId) break; 
+                    currentFrames = JSON.parse(JSON.stringify(savedAnimations[slot]));
+                    document.getElementById('frameCount').innerText = currentFrames.length;
+                    playIndex = 0; isPlaying = true; isPaused = false; document.getElementById('play-btn').innerText = "⏸️ Pause";
+                    await playLoop(macroLoopId); 
+                    if(!isMacroPlaying || macroLoopId !== activeLoopId) break; 
+                    let pauseMs = parseInt(document.getElementById('macro-pause').value);
+                    await new Promise(r => setTimeout(r, pauseMs));
+                }
+            }
+        }
+
+        // --- STORAGE & EXPORT ---
+        function updateSlotDropdown() {
+            const select = document.getElementById('slotSelect'); select.innerHTML = '';
+            for(let i=0; i<15; i++) {
+                let count = savedAnimations[i] ? savedAnimations[i].length : 0;
+                select.innerHTML += `<option value="${i}">Slot ${i+1} (${count > 0 ? count + ' frames' : 'Empty'})</option>`;
+            }
+        }
+        updateSlotDropdown();
+
+        function saveToSlot() {
+            if(currentFrames.length === 0) return alert("No active frames to save!");
+            const slot = parseInt(document.getElementById('slotSelect').value);
+            savedAnimations[slot] = JSON.parse(JSON.stringify(currentFrames));
+            localStorage.setItem('robotAnims', JSON.stringify(savedAnimations));
+            updateSlotDropdown(); document.getElementById('slotSelect').value = slot;
+            alert(`Saved ${currentFrames.length} frames to Slot ${slot+1}!`);
+        }
+
+        function loadFromSlot() {
+            const slot = parseInt(document.getElementById('slotSelect').value);
+            if(!savedAnimations[slot] || savedAnimations[slot].length === 0) return alert("That slot is empty!");
+            stopPlay(); currentFrames = JSON.parse(JSON.stringify(savedAnimations[slot]));
+            document.getElementById('frameCount').innerText = currentFrames.length;
+            currentFrames[0].forEach((val, i) => { currentPos[i] = val; });
+            syncUI(); queueSerialUpdate(); alert(`Loaded Slot ${slot+1}!`);
+        }
+
+        function exportAll() { 
+            let exportData = { slots: savedAnimations, hotkeys: savedHotkeys, calib: calibrationOffsets };
+            document.getElementById('io-box').value = JSON.stringify(exportData); 
+            alert("Exported! Copy the text."); 
+        }
+
+        let importConflicts = [], pendingImportData = [], currentConflictIndex = 0;
+        
+        function startImport() {
+            try {
+                const parsed = JSON.parse(document.getElementById('io-box').value);
+                let importedSlots = [];
+                let importedHotkeys = null;
+                let importedCalib = null;
+
+                if (Array.isArray(parsed) && parsed.length === 15) {
+                    importedSlots = parsed; 
+                } else if (parsed.slots && parsed.hotkeys) {
+                    importedSlots = parsed.slots;
+                    importedHotkeys = parsed.hotkeys;
+                    importedCalib = parsed.calib;
+                } else { throw new Error("Format"); }
+
+                if (importedHotkeys) {
+                    savedHotkeys = importedHotkeys.map((hk, i) => {
+                        if (!hk) return null;
+                        if (Array.isArray(hk)) return { name: `Pose ${i===9 ? 0 : i+1}`, pos: hk }; 
+                        return hk;
+                    });
+                    localStorage.setItem('robotHotkeysV2', JSON.stringify(savedHotkeys));
+                    renderHotkeys();
+                }
+                
+                if (importedCalib) {
+                    calibrationOffsets = importedCalib;
+                    for(let i=0; i<7; i++) { if(i!==2) document.getElementById(`c${i}`).value = calibrationOffsets[i]; }
+                    localStorage.setItem('robotCalibration', JSON.stringify(calibrationOffsets));
+                }
+
+                importConflicts = []; pendingImportData = Array(15).fill(null);
+                for(let i=0; i<15; i++) {
+                    let local = savedAnimations[i], imp = importedSlots[i];
+                    if (imp && imp.length > 0) {
+                        if (local && local.length > 0 && JSON.stringify(local) !== JSON.stringify(imp)) importConflicts.push({ slot: i, local: local, imp: imp });
+                        else pendingImportData[i] = imp;
+                    } else pendingImportData[i] = local;
+                }
+                if (importConflicts.length > 0) { currentConflictIndex = 0; showConflictUI(); } else finishImport();
+            } catch(e) { alert("Invalid code format!"); }
+        }
+
+        function showConflictUI() {
+            let conf = importConflicts[currentConflictIndex];
+            document.getElementById('conflict-text').innerText = `Conflict detected in Slot ${conf.slot + 1}:`;
+            document.getElementById('conf-local').innerText = conf.local.length; document.getElementById('conf-imp').innerText = conf.imp.length;
+            document.getElementById('conflict-modal').style.display = "flex";
+        }
+        function resolveConflict(decision) {
+            let conf = importConflicts[currentConflictIndex];
+            if (decision === 'local') pendingImportData[conf.slot] = conf.local;
+            else if (decision === 'import') pendingImportData[conf.slot] = conf.imp;
+            else if (decision === 'merge') pendingImportData[conf.slot] = conf.local.concat(conf.imp);
+            currentConflictIndex++;
+            if (currentConflictIndex < importConflicts.length) showConflictUI(); else { document.getElementById('conflict-modal').style.display = "none"; finishImport(); }
+        }
+        function cancelImport() { document.getElementById('conflict-modal').style.display = "none"; alert("Import cancelled."); }
+        function finishImport() { savedAnimations = pendingImportData; localStorage.setItem('robotAnims', JSON.stringify(savedAnimations)); updateSlotDropdown(); alert("Import complete!"); }
+    </script>
+</body>
+</html>
