@@ -59,13 +59,13 @@
         .safety-toggle { display: flex; align-items: center; gap: 8px; color: #a6e3a1; font-weight: bold; cursor: pointer; }
 
         /* Demo Overlay */
-        #demo-overlay { display: none; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(11, 14, 20, 0.9); z-index: 500; border-radius: 12px; flex-direction: column; justify-content: center; align-items: center;}
-        #demo-overlay h1 { color: #f38ba8; font-size: 3em; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 10px;}
+        #demo-overlay { display: none; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(11, 14, 20, 0.95); z-index: 500; border-radius: 12px; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px);}
+        #demo-overlay h1 { color: #f38ba8; font-size: 3.5em; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 10px; text-shadow: 0 0 15px rgba(243, 139, 168, 0.5);}
     </style>
 </head>
 <body>
 
-    <!-- Generic Custom Modals (Replaces native alerts/prompts) -->
+    <!-- Generic Custom Modals -->
     <div id="custom-alert-modal" class="modal-overlay">
         <div class="modal-content" style="border-color: #89b4fa;">
             <h3 id="alert-title" style="color:#89b4fa; margin-bottom:10px;">System Notice</h3>
@@ -145,8 +145,8 @@
         <!-- Demo Lock Overlay -->
         <div id="demo-overlay">
             <h1>DEMO MODE</h1>
-            <p style="color: #a6adc8; margin-bottom: 30px;">System locked. Running continuous cycle.</p>
-            <button class="warning" onclick="promptDemoExit()" style="padding: 15px 30px; font-size: 1.2em;">Unlock System</button>
+            <p style="color: #a6adc8; margin-bottom: 30px; font-size: 1.1em;">System locked. Running continuous cycle.</p>
+            <button id="unlock-btn" class="warning" onclick="promptDemoExit()" style="padding: 15px 30px; font-size: 1.2em; box-shadow: 0 0 15px rgba(249, 226, 175, 0.4);">Unlock System</button>
         </div>
 
         <h2>Robot Arm Controller</h2>
@@ -275,7 +275,7 @@
     </div>
 
     <script>
-        // --- CUSTOM MODAL CONTROLLERS (Replaces native alerts/prompts) ---
+        // --- CUSTOM MODAL CONTROLLERS ---
         let confirmResolve = null;
         let promptResolve = null;
 
@@ -328,11 +328,10 @@
             promptResolve = null;
         }
 
-
         // --- CORE STATE ---
         let port, writer;
-        let targetPos = [90, 90, 90, 90, 90, 90, 90]; // Where we WANT to go
-        let currentPos = [90, 90, 90, 90, 90, 90, 90]; // Where the robot actually IS
+        let targetPos = [90, 90, 90, 90, 90, 90, 90]; 
+        let currentPos = [90, 90, 90, 90, 90, 90, 90]; 
         let lastInputTime = Date.now();
         
         let calibrationOffsets = JSON.parse(localStorage.getItem('robotCalibration')) || [0, 0, 0, 0, 0, 0, 0];
@@ -342,8 +341,31 @@
 
         const servoNames = ['Base', 'Shoulder', 'Hidden', 'Elbow', 'W-Pitch', 'W-Roll', 'Gripper'];
 
-        // --- GLOBAL INTERPOLATOR (SPEED LIMITER) ---
+        // --- DEMO MODE INIT ---
+        let demoLockCode = localStorage.getItem('robotDemoLock') || "";
+        let isDemoMode = !!demoLockCode;
+
+        if (isDemoMode) {
+            document.getElementById('demo-overlay').style.display = 'flex';
+            window.addEventListener('load', () => setTimeout(() => toggleMacro(true), 500));
+        }
+
+        // --- GLOBAL INTERPOLATOR (SPEED LIMITER) & WATCHDOG ---
         setInterval(() => {
+            // ANTI-DEVTOOLS HACKER WATCHDOG
+            if (isDemoMode) {
+                let overlay = document.getElementById('demo-overlay');
+                if (!overlay || window.getComputedStyle(overlay).display === 'none' || window.getComputedStyle(overlay).visibility === 'hidden' || window.getComputedStyle(overlay).opacity === '0') {
+                    document.body.innerHTML = `
+                        <div style="height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#0b0e14; color:#f38ba8; z-index:9999;">
+                            <h1 style="font-size:3em; letter-spacing:3px; text-shadow:0 0 20px #f38ba8;">SECURITY BREACH DETECTED</h1>
+                            <p style="color:#a6adc8; font-size:1.2em;">DevTools tampering identified. Rebooting system...</p>
+                        </div>`;
+                    setTimeout(() => location.reload(), 2000);
+                    return; // Halt logic
+                }
+            }
+
             let changed = false;
             let isSafe = document.getElementById('safety-limit').checked;
             let maxStep = isSafe ? 2 : 180; 
@@ -359,7 +381,7 @@
             }
 
             // GHOST MODE LOGIC
-            if (document.getElementById('ghost-mode-toggle').checked && (Date.now() - lastInputTime > 3000) && !isPlaying) {
+            if (document.getElementById('ghost-mode-toggle').checked && (Date.now() - lastInputTime > 3000) && !isPlaying && !isDemoMode) {
                 let t = Date.now() / 1000;
                 targetPos[0] = 90 + Math.sin(t * 0.5) * 15; 
                 targetPos[1] = 90 + Math.cos(t * 0.3) * 10; 
@@ -384,6 +406,8 @@
         }
 
         function manualSliderUpdate(index, value) {
+            // Anti-script tamper defense: snap the slider back if locked
+            if (isDemoMode) { syncSliders(); return; }
             targetPos[index] = parseInt(value);
             updateActivity();
         }
@@ -401,12 +425,14 @@
         }
 
         function updateCalibration(index, value) {
+            if (isDemoMode) return;
             calibrationOffsets[index] = parseInt(value) || 0;
             localStorage.setItem('robotCalibration', JSON.stringify(calibrationOffsets));
             queueSerialUpdate(); 
         }
 
         function resetCalibration() {
+            if (isDemoMode) return;
             calibrationOffsets = [0,0,0,0,0,0,0];
             for(let i=0; i<7; i++) { if(i!==2) document.getElementById(`c${i}`).value = 0; }
             localStorage.setItem('robotCalibration', JSON.stringify(calibrationOffsets));
@@ -416,9 +442,10 @@
         // --- USB CONNECTION & AUTO RECONNECT ---
         let autoReconnectInterval = null;
         let shouldAutoReconnect = true;
-        let lastSentData = ""; // NEW: Stores the last packet to prevent spamming the Arduino
+        let lastSentData = ""; 
 
         document.getElementById('connect').onclick = async () => {
+            if (isDemoMode) return;
             try {
                 shouldAutoReconnect = true;
                 port = await navigator.serial.requestPort();
@@ -463,6 +490,7 @@
         }
 
         function cancelReconnect() {
+            if (isDemoMode) return;
             shouldAutoReconnect = false;
             if (autoReconnectInterval) clearInterval(autoReconnectInterval);
             autoReconnectInterval = null;
@@ -484,15 +512,13 @@
                         });
                         
                         let outStr = `ALL:${outputPos.join(',')}\n`;
-                        
-                        // NEW: Only send data if it actually changed to prevent 9600 baud buffer overflow
                         if (outStr !== lastSentData) {
                             await writer.write(new TextEncoder().encode(outStr));
                             lastSentData = outStr;
                         }
                     } catch(e) { console.error("Failed to write to port."); }
                     serialTimeout = null;
-                }, 80); // INCREASED: from 40ms to 80ms giving the Arduino time to digest the data
+                }, 80); 
             }
         }
 
@@ -501,75 +527,6 @@
                 if(i === 2) continue;
                 if(document.getElementById(`s${i}`)) document.getElementById(`s${i}`).value = targetPos[i];
             }
-        }
-
-        // --- KEYBOARD CONTROLS ---
-        window.addEventListener('keydown', (e) => {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || isDemoMode) return; 
-            const key = e.key.toLowerCase();
-            let changed = false;
-            let step = document.getElementById('safety-limit').checked ? 5 : 20;
-
-            if (key === 'w') { targetPos[3] = Math.max(0, targetPos[3] - step); changed = true; } 
-            if (key === 's') { targetPos[3] = Math.min(180, targetPos[3] + step); changed = true; } 
-            if (key === 'a') { targetPos[0] = Math.min(180, targetPos[0] + step); changed = true; } 
-            if (key === 'd') { targetPos[0] = Math.max(0, targetPos[0] - step); changed = true; } 
-            if (e.key === 'ArrowUp') { targetPos[1] = Math.max(0, targetPos[1] - step); changed = true; e.preventDefault();} 
-            if (e.key === 'ArrowDown') { targetPos[1] = Math.min(180, targetPos[1] + step); changed = true; e.preventDefault();} 
-            if (e.key === 'ArrowLeft') { targetPos[4] = Math.max(0, targetPos[4] - step); changed = true; e.preventDefault();} 
-            if (e.key === 'ArrowRight') { targetPos[4] = Math.min(180, targetPos[4] + step); changed = true; e.preventDefault();} 
-            if (key === 'q') { targetPos[5] = Math.max(0, targetPos[5] - step); changed = true; } 
-            if (key === 'e') { targetPos[5] = Math.min(180, targetPos[5] + step); changed = true; } 
-            if (key === ' ') { targetPos[6] = (targetPos[6] >= 45) ? 0 : 90; changed = true; e.preventDefault(); }
-            
-            if (key === 'f') { saveFrame(); e.preventDefault(); }
-            if (key >= '0' && key <= '9') { let idx = key === '0' ? 9 : parseInt(key) - 1; goHotkey(idx); changed = true;}
-
-            if (changed) { updateActivity(); syncSliders(); }
-        });
-
-        // --- NATIVE GAMEPAD SUPPORT ---
-        let gamepadIndex = null;
-        let lastGpGrip = false;
-        let lastGpSave = false;
-
-        window.addEventListener("gamepadconnected", (e) => {
-            gamepadIndex = e.gamepad.index;
-            document.getElementById('gamepad-status').innerText = `Gamepad: Connected`;
-            document.getElementById('gamepad-status').style.color = "#a6e3a1";
-            requestAnimationFrame(pollGamepad);
-        });
-        window.addEventListener("gamepaddisconnected", (e) => {
-            if (e.gamepad.index === gamepadIndex) gamepadIndex = null;
-            document.getElementById('gamepad-status').innerText = "Gamepad: Disconnected (Press any button)";
-            document.getElementById('gamepad-status').style.color = "#cba6f7";
-        });
-
-        function pollGamepad() {
-            if (gamepadIndex === null || isDemoMode) return;
-            const gp = navigator.getGamepads()[gamepadIndex];
-            if (!gp) return;
-            
-            let changed = false;
-            let step = document.getElementById('safety-limit').checked ? 2 : 10;
-            const deadzone = 0.15;
-
-            if (Math.abs(gp.axes[1]) > deadzone) { targetPos[3] = Math.max(0, Math.min(180, targetPos[3] + gp.axes[1] * step)); changed = true; }
-            if (Math.abs(gp.axes[0]) > deadzone) { targetPos[0] = Math.max(0, Math.min(180, targetPos[0] + gp.axes[0] * step)); changed = true; }
-            if (Math.abs(gp.axes[3]) > deadzone) { targetPos[1] = Math.max(0, Math.min(180, targetPos[1] + gp.axes[3] * step)); changed = true; }
-            if (Math.abs(gp.axes[2]) > deadzone) { targetPos[4] = Math.max(0, Math.min(180, targetPos[4] - gp.axes[2] * step)); changed = true; }
-            
-            if (gp.buttons[14] && gp.buttons[14].pressed) { targetPos[5] = Math.max(0, targetPos[5] - step); changed = true; }
-            if (gp.buttons[15] && gp.buttons[15].pressed) { targetPos[5] = Math.min(180, targetPos[5] + step); changed = true; }
-
-            if (gp.buttons[0] && gp.buttons[0].pressed && !lastGpGrip) { targetPos[6] = (targetPos[6] >= 45) ? 0 : 90; changed = true; }
-            lastGpGrip = gp.buttons[0] ? gp.buttons[0].pressed : false;
-
-            if (gp.buttons[1] && gp.buttons[1].pressed && !lastGpSave) { saveFrame(); }
-            lastGpSave = gp.buttons[1] ? gp.buttons[1].pressed : false;
-
-            if (changed) { updateActivity(); syncSliders(); }
-            requestAnimationFrame(pollGamepad);
         }
 
         // --- RENAMEABLE HOTKEYS ---
@@ -596,17 +553,20 @@
         renderHotkeys();
 
         function updateHotkeyName(index, newName) {
+            if (isDemoMode) return;
             if (!savedHotkeys[index]) savedHotkeys[index] = { name: newName, pos: null };
             else savedHotkeys[index].name = newName;
             localStorage.setItem('robotHotkeysV2', JSON.stringify(savedHotkeys));
         }
         function setHotkey(index) {
+            if (isDemoMode) return customAlert("System is locked.", "Access Denied");
             let currentName = savedHotkeys[index] ? savedHotkeys[index].name : `Pose ${index+1}`;
             savedHotkeys[index] = { name: currentName, pos: [...targetPos] };
             localStorage.setItem('robotHotkeysV2', JSON.stringify(savedHotkeys));
             renderHotkeys();
         }
         function goHotkey(index) {
+            if (isDemoMode) return;
             if (savedHotkeys[index] && savedHotkeys[index].pos) {
                 targetPos = [...savedHotkeys[index].pos];
                 updateActivity(); syncSliders();
@@ -615,9 +575,10 @@
 
         // --- WIIMOTE INTEGRATION ---
         let wiimote = null, isWiiCalibrated = false, wiiCalib = {x: 128, y: 128, z: 128}, gripperClosed = false, lastWiiB = false;
-        let smoothX = 128, smoothY = 128; // NEW: Wiimote shock absorbers
+        let smoothX = 128, smoothY = 128;
 
         async function connectWiimote() {
+            if (isDemoMode) return;
             if (!navigator.hid) return customAlert("WebHID not supported in this browser.", "Error");
             try {
                 const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x057e }] });
@@ -656,7 +617,6 @@
             if (btnA) { document.getElementById('wii-status').innerText = "Status: PAUSED"; document.getElementById('wii-status').style.color = "#f38ba8"; return; } 
             else { document.getElementById('wii-status').innerText = "Status: Active!"; document.getElementById('wii-status').style.color = "#a6e3a1"; }
 
-            // NEW: Exponential Moving Average filter to kill the hand shakes
             const filterSpeed = 0.15;
             smoothX = (ax * filterSpeed) + (smoothX * (1 - filterSpeed));
             smoothY = (ay * filterSpeed) + (smoothY * (1 - filterSpeed));
@@ -671,12 +631,22 @@
         }
 
         // --- ANIMATION / MACRO LOGIC ---
-        function saveFrame() { targetPos.forEach((v,i) => currentPos[i] = v); currentFrames.push([...targetPos]); document.getElementById('frameCount').innerText = currentFrames.length; }
-        function clearFrames() { stopPlay(); currentFrames = []; document.getElementById('frameCount').innerText = "0"; }
+        function saveFrame() { 
+            if (isDemoMode) return customAlert("System is locked.", "Access Denied");
+            targetPos.forEach((v,i) => currentPos[i] = v); 
+            currentFrames.push([...targetPos]); 
+            document.getElementById('frameCount').innerText = currentFrames.length; 
+        }
+        function clearFrames() { 
+            if (isDemoMode) return customAlert("System is locked.", "Access Denied");
+            stopPlay(); currentFrames = []; 
+            document.getElementById('frameCount').innerText = "0"; 
+        }
 
         let isPlaying = false, isPaused = false, playIndex = 0, isMacroPlaying = false, activeLoopId = 0;
         
         async function togglePlay() {
+            if (isDemoMode) return;
             if (currentFrames.length === 0) return customAlert("Cannot play: The buffer is empty.", "Playback Error");
             if (!isPlaying) { isPlaying = true; isPaused = false; activeLoopId++; document.getElementById('play-btn').innerText = "Pause"; playLoop(activeLoopId); } 
             else if (!isPaused) { isPaused = true; document.getElementById('play-btn').innerText = "Resume"; } 
@@ -703,11 +673,11 @@
                 }
             }
             if(!isMacroPlaying && loopId === activeLoopId && !isDemoMode) stopPlay();
-            if(isDemoMode && !isMacroPlaying) { playIndex = 0; } // Failsafe loop in demo mode
+            if(isDemoMode && !isMacroPlaying) { playIndex = 0; } 
         }
 
         async function toggleMacro(shuffle) {
-            if(isMacroPlaying) { stopPlay(); return; }
+            if(isMacroPlaying && !isDemoMode) { stopPlay(); return; }
             let activeSlots = []; for(let i=0; i<15; i++) if(savedAnimations[i] && savedAnimations[i].length > 0) activeSlots.push(i);
             if(activeSlots.length === 0) return customAlert("Cannot start macro: The library is empty.", "Macro Error");
             
@@ -741,6 +711,7 @@
         updateSlotDropdown();
 
         async function attemptWipeLibrary() {
+            if (isDemoMode) return customAlert("System is locked.", "Access Denied");
             let result = await customConfirm("Are you sure you want to permanently wipe all 15 Library slots? This cannot be undone.");
             if (result) {
                 savedAnimations = Array(15).fill(null);
@@ -751,6 +722,7 @@
         }
 
         function openSaveModal() {
+            if (isDemoMode) return customAlert("System is locked.", "Access Denied");
             if(currentFrames.length === 0) return customAlert("The buffer is empty. Add poses before saving.", "Save Error");
             const slot = parseInt(document.getElementById('slotSelect').value);
             document.getElementById('save-slot-target').innerText = `Slot ${slot+1}`;
@@ -770,6 +742,7 @@
         }
 
         function loadFromSlot() {
+            if (isDemoMode) return customAlert("System is locked.", "Access Denied");
             const slot = parseInt(document.getElementById('slotSelect').value);
             if(!savedAnimations[slot] || savedAnimations[slot].length === 0) return customAlert("That slot is empty!", "Load Error");
             stopPlay(); currentFrames = JSON.parse(JSON.stringify(savedAnimations[slot]));
@@ -779,36 +752,23 @@
         }
 
         // --- DEMO MODE (ENCRYPTION & LOCK) ---
-        let demoLockCode = localStorage.getItem('robotDemoLock') || "";
-        let isDemoMode = !!demoLockCode;
-
-        // Auto-lock if the system was locked before refresh
-        if (isDemoMode) {
-            document.getElementById('demo-overlay').style.display = 'flex';
-            // Slight delay to ensure everything is loaded before macro starts
-            window.addEventListener('load', () => setTimeout(() => toggleMacro(true), 500));
-        }
-
         function startDemoMode() {
             let pin = document.getElementById('demo-pin-input').value;
             if(!pin) return customAlert("Please enter a PIN to lock the system.", "Missing PIN");
             
-            // "Encryption" (Base64 + Salt)
             demoLockCode = btoa(encodeURIComponent("RBT_" + pin)); 
             localStorage.setItem('robotDemoLock', demoLockCode);
             
             isDemoMode = true;
             document.getElementById('demo-overlay').style.display = 'flex';
             closeModals();
-            
-            toggleMacro(true); // Start shuffle macro
+            toggleMacro(true); 
         }
 
         async function promptDemoExit() {
             let attempt = await customPrompt("Unlock System", "Enter Security PIN to unlock:", "password");
             if (attempt === null) return;
             
-            // "Decryption" check
             let encodedAttempt = btoa(encodeURIComponent("RBT_" + attempt));
             if (encodedAttempt === demoLockCode) {
                 isDemoMode = false;
@@ -824,6 +784,7 @@
 
         // --- IN-APP DECRYPTION TOOL ---
         async function decryptDemoCode() {
+            if (isDemoMode) return customAlert("System is locked.", "Access Denied");
             let code = await customPrompt("Decrypt Demo Code", "Paste the exported Demo Lock Code here:");
             if (!code) return;
             
@@ -842,15 +803,15 @@
 
         // --- IMPORT/EXPORT FULL ---
         function exportAll() { 
+            if (isDemoMode) return customAlert("System is locked.", "Access Denied");
             let exportData = { slots: savedAnimations, hotkeys: savedHotkeys, calib: calibrationOffsets };
             if(demoLockCode) exportData.demoLock = demoLockCode;
             document.getElementById('io-box').value = JSON.stringify(exportData); 
             customAlert("System Data exported to the text box.", "Export Successful");
         }
 
-        let importConflicts = [], pendingImportData = [], currentConflictIndex = 0;
-        
         function startImport() {
+            if (isDemoMode) return customAlert("System is locked.", "Access Denied");
             try {
                 const parsed = JSON.parse(document.getElementById('io-box').value);
                 let importedSlots = [], importedHotkeys = null, importedCalib = null, importedDemoLock = null;
