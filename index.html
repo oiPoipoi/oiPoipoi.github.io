@@ -200,8 +200,8 @@
                 <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #45475a;">
                     <h4 style="margin:0 0 10px 0; color:#cba6f7;">Animation Style Engine</h4>
                     <select id="anim-style" style="width: 100%; text-align: center;">
-                        <option value="organic">🌊 Organic (Smooth Bezier Ease-Out)</option>
-                        <option value="robotic">🤖 Robotic (Linear Direct)</option>
+                        <option value="organic">Organic (Smooth Bezier Ease-Out)</option>
+                        <option value="robotic">Robotic (Linear Direct)</option>
                     </select>
                 </div>
 
@@ -269,7 +269,7 @@
                     <button onclick="exportAll()">Export System Data</button>
                     <button onclick="startImport()" class="warning">Import System Data</button>
                 </div>
-                <button onclick="decryptDemoCode()" class="purple" style="margin-top:10px;">🔓 Decrypt Demo Code</button>
+                <button onclick="decryptDemoCode()" class="purple" style="margin-top:10px;">Decrypt Demo Code</button>
                 <textarea id="io-box" placeholder="Data payload box..."></textarea>
             </div>
         </details>
@@ -388,7 +388,7 @@
             if (!aiActive) {
                 aiActive = true;
                 document.getElementById('ai-vision-container').style.display = 'block';
-                document.getElementById('ai-btn').innerText = "🛑 Stop AI Vision";
+                document.getElementById('ai-btn').innerText = "Stop AI Vision";
                 document.getElementById('ai-btn').className = "danger";
                 
                 await initAI();
