@@ -74,37 +74,41 @@
         #ai-status-overlay { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 4px; font-size: 0.8em; font-weight: bold; color: #a6e3a1; z-index: 101;}
 
         /* --- AR DOM OVERLAY UI --- */
-        #xr-ui-overlay { display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; flex-direction: column; justify-content: flex-end; align-items: center; z-index: 9999; padding-bottom: 50px;}
-        #ar-panel { pointer-events: auto; background: rgba(30, 31, 46, 0.9); border: 2px solid #89b4fa; padding: 20px; border-radius: 12px; width: 400px; box-shadow: 0 0 20px rgba(0,0,0,0.8); display: flex; flex-direction: column; gap: 10px;}
-        .ar-btn { pointer-events: auto; background: #a6e3a1; color: #11111b; padding: 10px 20px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; text-transform: uppercase; margin-bottom: 10px;}
-        .ar-slider-row { display: flex; align-items: center; justify-content: space-between; color: #cdd6f4; font-weight: bold; font-family: sans-serif; font-size: 0.9em;}
-        .ar-slider-row input { flex-grow: 1; margin: 0 10px;}
+        #xr-ui-overlay { display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999; }
+        #xr-ui-inner { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; width: 100%; max-width: 450px;}
+        #ar-panel { pointer-events: auto; background: rgba(30, 31, 46, 0.95); border: 2px solid #89b4fa; padding: 20px; border-radius: 12px; width: 100%; box-shadow: 0 0 30px rgba(0,0,0,0.9); display: flex; flex-direction: column; gap: 10px;}
+        .ar-btn { pointer-events: auto; background: #a6e3a1; color: #11111b; padding: 10px 20px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; text-transform: uppercase; margin-bottom: 10px; font-size: 1.1em;}
+        .ar-slider-row { display: flex; align-items: center; justify-content: space-between; color: #cdd6f4; font-weight: bold; font-family: sans-serif; font-size: 1em;}
+        .ar-slider-row input { flex-grow: 1; margin: 0 10px; height: 25px;}
     </style>
 </head>
 <body>
 
     <!-- AR DOM OVERLAY (Visible only in headset) -->
     <div id="xr-ui-overlay">
-        <button id="ar-ui-toggle" class="ar-btn" style="background:#cba6f7;">Hide AR UI</button>
-        <div id="ar-panel">
-            <h3 style="margin: 0 0 10px 0; color:#89b4fa; text-align:center;">Hologram Calibration</h3>
-            
-            <div class="ar-slider-row"><span>X-Offset</span><input type="range" id="ar-x" min="-1" max="1" step="0.01" value="0"></div>
-            <div class="ar-slider-row"><span>Y-Offset</span><input type="range" id="ar-y" min="-1" max="1" step="0.01" value="0"></div>
-            <div class="ar-slider-row"><span>Z-Offset</span><input type="range" id="ar-z" min="-2" max="1" step="0.01" value="-0.5"></div>
-            <div class="ar-slider-row"><span>Rotate</span><input type="range" id="ar-rot" min="-180" max="180" step="1" value="0"></div>
-            
-            <hr style="border-color: #585b70; margin: 10px 0;">
-            
-            <div style="display: flex; gap: 10px;">
-                <button class="success" style="flex:1;" onclick="window.saveFrame()">Save Pose</button>
-                <button class="danger" style="flex:1;" onclick="window.clearFrames()">Clear Buffer</button>
+        <div id="xr-ui-inner">
+            <button id="ar-ui-toggle" class="ar-btn" style="background:#cba6f7; box-shadow: 0 4px 10px rgba(203, 166, 247, 0.5);">Hide Hologram Menu</button>
+            <div id="ar-panel">
+                <h3 style="margin: 0 0 10px 0; color:#89b4fa; text-align:center;">Hologram Calibration</h3>
+                
+                <div class="ar-slider-row"><span>X-Offset</span><input type="range" id="ar-x" min="-1" max="1" step="0.01" value="0"></div>
+                <div class="ar-slider-row"><span>Y-Height</span><input type="range" id="ar-y" min="0" max="1.5" step="0.01" value="0.8"></div>
+                <div class="ar-slider-row"><span>Z-Depth</span><input type="range" id="ar-z" min="-2" max="1" step="0.01" value="-0.5"></div>
+                <div class="ar-slider-row"><span>Rotate</span><input type="range" id="ar-rot" min="-180" max="180" step="1" value="0"></div>
+                
+                <hr style="border-color: #585b70; margin: 10px 0;">
+                
+                <div style="display: flex; gap: 10px;">
+                    <button class="success" style="flex:1; padding: 12px; font-size: 1em;" onclick="window.saveFrame()">Save Pose</button>
+                    <button class="danger" style="flex:1; padding: 12px; font-size: 1em;" onclick="window.clearFrames()">Clear Buffer</button>
+                </div>
+                
+                <p style="color:#a6adc8; font-size:0.85em; margin: 10px 0 0 0; text-align:center; line-height: 1.4;">
+                    <b>Look away from this menu to use controls!</b><br>
+                    <b>Controllers:</b> Thumbsticks move arm. A=Save, X=Grip.<br>
+                    <b>Hands:</b> Pinch hologram joints to bend them. Pinch the tip to Grip.
+                </p>
             </div>
-            
-            <p style="color:#a6adc8; font-size:0.8em; margin: 10px 0 0 0; text-align:center;">
-                <b>Quest Controllers:</b> Thumbsticks move arm. A=Save Pose, X=Grip.<br>
-                <b>Hands:</b> Pinch thumb & index to Grip.
-            </p>
         </div>
     </div>
 
@@ -169,10 +173,11 @@
         <h2>Robot Arm Controller</h2>
         
         <div class="top-bar">
-            <div style="text-align:left;">
-                <button id="connect" class="success" style="margin:0;">Connect USB</button>
+            <div style="text-align:left; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button id="connect" class="success" style="margin:0;">🔌 Connect USB</button>
+                <!-- AR BUTTON IS NOW INJECTED HERE -->
+                <div id="xr-btn-container"></div> 
                 <button id="cancel-reconnect-btn" class="danger" style="display:none; margin:0;" onclick="cancelReconnect()">Stop Reconnect</button>
-                <div id="status" style="color: #a6adc8; font-weight: bold; font-size: 0.85em; margin-top:5px;">System Offline</div>
             </div>
             
             <div style="display:flex; flex-direction:column; gap:5px; align-items:flex-end;">
@@ -182,17 +187,15 @@
                 <button class="danger" style="padding: 4px 8px; font-size: 0.7em; margin:0;" onclick="document.getElementById('demo-setup-modal').style.display='flex'">Demo Mode</button>
             </div>
         </div>
+        <div id="status" style="color: #a6adc8; font-weight: bold; font-size: 0.85em; margin-top:-10px; margin-bottom: 15px; text-align: left;">System Offline</div>
 
         <!-- MAIN SLIDERS -->
         <div id="sliders" style="margin-bottom: 20px;"></div>
 
         <!-- EXTERNAL CONTROLLERS -->
         <details open>
-            <summary><h3>External Controllers (XR / AI)</h3></summary>
+            <summary><h3>External Controllers (Webcam AI)</h3></summary>
             <div class="details-content">
-                <div class="controls-row" id="xr-btn-container">
-                    <!-- WebXR Button injected here via Three.js -->
-                </div>
                 <div class="controls-row">
                     <button id="ai-btn" class="purple" onclick="toggleAI()">👁️ Start AI Vision (Webcam)</button>
                     <button id="wii-connect" class="purple" onclick="connectWiimote()">Sync Wiimote</button>
@@ -202,7 +205,7 @@
                         <input type="checkbox" id="ghost-mode-toggle"> Ghost Mode (Idle Auto-Move)
                     </label>
                 </div>
-                <p id="wii-status" style="color: #a6adc8; font-weight: bold; margin-top: 10px;">Wiimote: Disconnected</p>
+                <p id="wii-status" style="color: #a6adc8; font-weight: bold; margin-top: 10px; margin-bottom: 0;">Wiimote: Disconnected</p>
                 <p id="gamepad-status" style="color: #cba6f7; font-weight:bold; margin:0;">Gamepad: Disconnected</p>
             </div>
         </details>
@@ -530,7 +533,7 @@
             if (!aiActive) {
                 aiActive = true;
                 document.getElementById('ai-vision-container').style.display = 'block';
-                document.getElementById('ai-btn').innerText = "Stop AI Vision";
+                document.getElementById('ai-btn').innerText = "🛑 Stop AI Vision";
                 document.getElementById('ai-btn').className = "danger";
                 await initAI();
                 if (!aiCamera) { aiCamera = new Camera(videoElement, { onFrame: async () => { await aiHands.send({image: videoElement}); }, width: 320, height: 240 }); }
@@ -572,14 +575,18 @@
         let camera, scene, renderer;
         let robotRoot, baseMesh, shoulderMesh, elbowMesh, wPitchMesh, wRollMesh;
         let lastXR_A = false, lastXR_X = false, lastXR_Pinch = false;
+        
+        // --- NEW: Spatial Grabbing State ---
+        let activeGrabJoint = null;
+        let grabStartHandPos = new THREE.Vector3();
+        let grabStartAngle = 0;
 
-        // AR Calibration Data
-        let arOffsets = JSON.parse(localStorage.getItem('robotARCalib')) || { x:0, y:0, z:-0.5, r:0 };
+        // Make defaults optimized for a desk instead of eye-level (Y = 0.8 meters from floor)
+        let arOffsets = JSON.parse(localStorage.getItem('robotARCalib')) || { x:0, y:0.8, z:-0.5, r:0 };
 
         initXR();
 
         function initXR() {
-            // Three.js Scene Setup
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
             scene.add(new THREE.HemisphereLight(0x89b4fa, 0x1e1e2e, 1));
@@ -593,10 +600,12 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
 
-            // Inject the Enter AR button into our UI
             const arBtnContainer = document.getElementById('xr-btn-container');
             const overlayRoot = document.getElementById('xr-ui-overlay');
+            
+            // REQUIRED: local-floor ensures the Y coordinate 0 is the physical floor of your room.
             const arBtn = ARButton.createButton(renderer, {
+                requiredFeatures: ['local-floor'], 
                 optionalFeatures: ['dom-overlay', 'hand-tracking'],
                 domOverlay: { root: overlayRoot }
             });
@@ -604,24 +613,21 @@
             arBtn.innerText = "👓 Enter AR Mode (Quest 3)";
             arBtnContainer.appendChild(arBtn);
 
-            // Construct 3D Dummy Robot
             buildDummyRobot();
 
-            // Setup DOM Overlay UI Event Listeners
             document.getElementById('ar-ui-toggle').addEventListener('click', () => {
                 let panel = document.getElementById('ar-panel');
                 let btn = document.getElementById('ar-ui-toggle');
                 if(panel.style.display === 'none') {
                     panel.style.display = 'flex';
-                    btn.innerText = "Hide AR UI";
+                    btn.innerText = "Hide Hologram Menu";
                 } else {
                     panel.style.display = 'none';
-                    btn.innerText = "Show AR UI";
+                    btn.innerText = "Show Hologram Menu";
                 }
             });
 
-            // Bind Sliders to Calibration
-            const bindSlider = (id, key, multiplier=1) => {
+            const bindSlider = (id, key) => {
                 const el = document.getElementById(id);
                 el.value = arOffsets[key];
                 el.addEventListener('input', (e) => {
@@ -642,54 +648,41 @@
             const matLink = new THREE.MeshPhongMaterial({ color: 0x89b4fa, transparent: true, opacity: 0.8 });
             const matJoint = new THREE.MeshPhongMaterial({ color: 0xcba6f7 });
 
-            // 0: Base
             baseMesh = new THREE.Group();
             let baseCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.05, 16), matBase);
             baseCyl.position.y = 0.025;
             baseMesh.add(baseCyl);
             robotRoot.add(baseMesh);
 
-            // 1: Shoulder (Pivot)
             shoulderMesh = new THREE.Group();
             shoulderMesh.position.y = 0.05;
             let shSphere = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 16), matJoint);
             let bicep = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, 0.03), matLink);
-            bicep.position.y = 0.1; // Offset center
-            shoulderMesh.add(shSphere);
-            shoulderMesh.add(bicep);
-            baseMesh.add(shoulderMesh);
+            bicep.position.y = 0.1; 
+            shoulderMesh.add(shSphere); shoulderMesh.add(bicep); baseMesh.add(shoulderMesh);
 
-            // 3: Elbow (Pivot)
             elbowMesh = new THREE.Group();
-            elbowMesh.position.y = 0.2; // at end of bicep
+            elbowMesh.position.y = 0.2; 
             let elSphere = new THREE.Mesh(new THREE.SphereGeometry(0.03, 16, 16), matJoint);
             let forearm = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.2, 0.025), matLink);
             forearm.position.y = 0.1;
-            elbowMesh.add(elSphere);
-            elbowMesh.add(forearm);
-            shoulderMesh.add(elbowMesh);
+            elbowMesh.add(elSphere); elbowMesh.add(forearm); shoulderMesh.add(elbowMesh);
 
-            // 4: Wrist Pitch
             wPitchMesh = new THREE.Group();
             wPitchMesh.position.y = 0.2;
             let wpSphere = new THREE.Mesh(new THREE.SphereGeometry(0.02, 16, 16), matJoint);
-            wPitchMesh.add(wpSphere);
-            elbowMesh.add(wPitchMesh);
+            wPitchMesh.add(wpSphere); elbowMesh.add(wPitchMesh);
 
-            // 5: Wrist Roll & Gripper
             wRollMesh = new THREE.Group();
             let gripperBase = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.02, 0.04), matBase);
             gripperBase.position.y = 0.02;
-            wRollMesh.add(gripperBase);
-            wPitchMesh.add(wRollMesh);
+            wRollMesh.add(gripperBase); wPitchMesh.add(wRollMesh);
         }
 
         function renderXR() {
-            // Apply AR Calibration Offsets
             robotRoot.position.set(arOffsets.x, arOffsets.y, arOffsets.z);
             robotRoot.rotation.y = THREE.MathUtils.degToRad(arOffsets.r);
 
-            // Sync Hologram with Dashboard `currentPos`
             if(window.currentPos) {
                 baseMesh.rotation.y = THREE.MathUtils.degToRad(window.currentPos[0] - 90);
                 shoulderMesh.rotation.z = THREE.MathUtils.degToRad(window.currentPos[1] - 90);
@@ -710,32 +703,24 @@
             let step = document.getElementById('safety-limit') && document.getElementById('safety-limit').checked ? 1.5 : 5;
             
             for (const source of session.inputSources) {
-                // META QUEST CONTROLLERS
                 if (source.gamepad) {
                     if (source.handedness === 'right') {
-                        // A Button [index 4] -> Save Pose
                         if (source.gamepad.buttons[4]?.pressed && !lastXR_A) { window.saveFrame(); }
                         lastXR_A = source.gamepad.buttons[4]?.pressed;
                         
-                        // Right Thumbstick -> Base (X), Shoulder (Y)
                         if (Math.abs(source.gamepad.axes[2]) > 0.15) { window.targetPos[0] -= source.gamepad.axes[2] * step; changed = true; }
                         if (Math.abs(source.gamepad.axes[3]) > 0.15) { window.targetPos[1] -= source.gamepad.axes[3] * step; changed = true; }
                     }
                     if (source.handedness === 'left') {
-                        // X Button [index 4] -> Toggle Gripper
-                        if (source.gamepad.buttons[4]?.pressed && !lastXR_X) {
-                            window.targetPos[6] = window.targetPos[6] >= 45 ? 0 : 90;
-                            changed = true;
-                        }
+                        if (source.gamepad.buttons[4]?.pressed && !lastXR_X) { window.targetPos[6] = window.targetPos[6] >= 45 ? 0 : 90; changed = true; }
                         lastXR_X = source.gamepad.buttons[4]?.pressed;
                         
-                        // Left Thumbstick -> Elbow (Y), Wrist Pitch (X)
                         if (Math.abs(source.gamepad.axes[3]) > 0.15) { window.targetPos[3] -= source.gamepad.axes[3] * step; changed = true; }
                         if (Math.abs(source.gamepad.axes[2]) > 0.15) { window.targetPos[4] += source.gamepad.axes[2] * step; changed = true; }
                     }
                 }
                 
-                // NATIVE HAND TRACKING (Pinch to Grip)
+                // NATIVE HAND TRACKING (Direct Joint Manipulation)
                 if (source.hand) {
                     try {
                         const thumbTip = source.hand.get('thumb-tip');
@@ -743,12 +728,67 @@
                         if (thumbTip && indexTip) {
                             const p1 = thumbTip.position; const p2 = indexTip.position;
                             const dist = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2) + Math.pow(p1.z - p2.z, 2));
+                            const pinchCenter = new THREE.Vector3((p1.x+p2.x)/2, (p1.y+p2.y)/2, (p1.z+p2.z)/2);
                             
-                            if (dist < 0.02 && !lastXR_Pinch) { // Fingers touching
-                                window.targetPos[6] = window.targetPos[6] >= 45 ? 0 : 90;
-                                changed = true; lastXR_Pinch = true;
-                            } else if (dist >= 0.04) {
+                            if (dist < 0.03) { 
+                                // PINCH JUST STARTED
+                                if (!lastXR_Pinch) {
+                                    lastXR_Pinch = true;
+                                    
+                                    // 1. Array of all grabbable physical joints
+                                    let joints = [
+                                        { idx: 0, mesh: baseMesh },
+                                        { idx: 1, mesh: shoulderMesh },
+                                        { idx: 3, mesh: elbowMesh },
+                                        { idx: 4, mesh: wPitchMesh },
+                                        { idx: 5, mesh: wRollMesh },
+                                        { idx: 6, mesh: wRollMesh.children[0] } // The Gripper Base
+                                    ];
+                                    
+                                    // 2. Find which joint your hand is closest to
+                                    let closestIdx = -1; let minDist = 0.15; // 15cm grab radius
+                                    let wpVec = new THREE.Vector3();
+                                    
+                                    joints.forEach(j => {
+                                        j.mesh.getWorldPosition(wpVec);
+                                        let d = wpVec.distanceTo(pinchCenter);
+                                        if (d < minDist) { minDist = d; closestIdx = j.idx; }
+                                    });
+                                    
+                                    // 3. Lock onto that joint
+                                    if (closestIdx !== -1) {
+                                        if (closestIdx === 6) { // Snapped the Gripper
+                                            window.targetPos[6] = window.targetPos[6] >= 45 ? 0 : 90;
+                                            changed = true; activeGrabJoint = null; 
+                                        } else { // Grabbed a rotating joint
+                                            activeGrabJoint = closestIdx;
+                                            grabStartHandPos.copy(pinchCenter);
+                                            grabStartAngle = window.targetPos[closestIdx];
+                                        }
+                                    }
+                                } 
+                                // PINCH IS BEING HELD & DRAGGED
+                                else if (activeGrabJoint !== null) {
+                                    let sensitivity = 400; // Degrees to rotate per meter of physical hand movement
+                                    let deltaAngle = 0;
+                                    
+                                    // Base and Wrist Roll use horizontal (X) hand movement
+                                    if (activeGrabJoint === 0 || activeGrabJoint === 5) {
+                                        deltaAngle = -(pinchCenter.x - grabStartHandPos.x) * sensitivity; 
+                                    } 
+                                    // Shoulder, Elbow, Pitch use vertical (Y) hand movement
+                                    else {
+                                        deltaAngle = (pinchCenter.y - grabStartHandPos.y) * sensitivity; 
+                                    }
+                                    
+                                    window.targetPos[activeGrabJoint] = Math.max(0, Math.min(180, grabStartAngle + deltaAngle));
+                                    changed = true;
+                                }
+                            } 
+                            // PINCH RELEASED
+                            else if (dist >= 0.05) {
                                 lastXR_Pinch = false;
+                                activeGrabJoint = null; // Let go of the joint
                             }
                         }
                     } catch(e) {}
