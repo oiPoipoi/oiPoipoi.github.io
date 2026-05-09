@@ -362,6 +362,7 @@
         let aiActive = false;
         let aiCamera = null;
         let aiHands = null;
+        let aiSmoothX = 0.5, aiSmoothY = 0.5, aiSmoothRoll = 90;
 
         async function initAI() {
             if (aiHands) return;
@@ -399,12 +400,12 @@
                     });
                 }
                 aiCamera.start();
-                document.getElementById('ai-status-overlay').innerText = "AI ACTIVE: PUPPET MODE";
+                document.getElementById('ai-status-overlay').innerText = "AI MODE";
                 document.getElementById('ai-status-overlay').style.color = "#a6e3a1";
             } else {
                 aiActive = false;
                 document.getElementById('ai-vision-container').style.display = 'none';
-                document.getElementById('ai-btn').innerText = "👁️ Start AI Vision (Webcam)";
+                document.getElementById('ai-btn').innerText = "Start AI Vision (Webcam)";
                 document.getElementById('ai-btn').className = "purple";
                 if (aiCamera) aiCamera.stop();
             }
@@ -425,19 +426,21 @@
                 drawLandmarks(canvasCtx, landmarks, {color: '#a6e3a1', lineWidth: 1, radius: 2});
 
                 // --- PUPPETEER MATH ---
-                // MediaPipe gives coordinates as 0.0 to 1.0 percentages of the screen.
+                // Add shock absorbers to the AI to prevent twitchiness
+                const filterSpeed = 0.15; 
+                aiSmoothX = (landmarks[9].x * filterSpeed) + (aiSmoothX * (1 - filterSpeed));
+                aiSmoothY = (landmarks[9].y * filterSpeed) + (aiSmoothY * (1 - filterSpeed));
 
-                // 1. Base (Palm X) - Mapped from middle of screen to avoid stretching
-                let rawX = landmarks[9].x; 
-                let baseX = 180 - ((rawX - 0.2) / 0.6 * 180); 
+                // 1. Base (Palm X) - Widened box (0.1 to 0.9) requires larger physical hand movements
+                let baseX = 180 - ((aiSmoothX - 0.1) / 0.8 * 180); 
 
-                // 2. Shoulder/Elbow (Palm Y)
-                let rawY = landmarks[9].y;
-                let liftY = 180 - ((rawY - 0.3) / 0.5 * 180);
+                // 2. Shoulder/Elbow (Palm Y) - Widened box (0.1 to 0.9)
+                let liftY = 180 - ((aiSmoothY - 0.1) / 0.8 * 180);
 
                 // 3. Wrist Roll (Angle of palm relative to wrist)
                 let angle = Math.atan2(landmarks[9].y - landmarks[0].y, landmarks[9].x - landmarks[0].x);
-                let roll = (angle * 180 / Math.PI) + 90; 
+                let rawRoll = (angle * 180 / Math.PI) + 90; 
+                aiSmoothRoll = (rawRoll * filterSpeed) + (aiSmoothRoll * (1 - filterSpeed));
 
                 // 4. Gripper (Distance between Thumb(4) and Index(8))
                 let dx = landmarks[8].x - landmarks[4].x;
@@ -449,7 +452,7 @@
                 targetPos[0] = Math.max(0, Math.min(180, baseX));
                 targetPos[1] = Math.max(0, Math.min(180, liftY));
                 targetPos[3] = Math.max(0, Math.min(180, 180 - (liftY * 0.7))); // Synergistic IK for Elbow
-                targetPos[5] = Math.max(0, Math.min(180, roll));
+                targetPos[5] = Math.max(0, Math.min(180, aiSmoothRoll));
                 targetPos[6] = grip;
 
                 updateActivity();
