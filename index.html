@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Robot Arm Controller</title>
+    
+    <!-- MediaPipe Neural Network Libraries (WebAssembly) -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        /* Classic Theme */
+        body { font-family: sans-serif; background: #1e1e2e; color: #cdd6f4; text-align: center; padding: 20px; margin: 0; }
+        .card { background: #313244; padding: 25px; border-radius: 12px; display: inline-block; max-width: 850px; width: 100%; box-shadow: 0 8px 16px rgba(0,0,0,0.6); position: relative;}
+        h2, h3 { margin-top: 0; color: #89b4fa; }
+        
+        /* Collapsibles */
+        details { background: #181825; margin-bottom: 15px; border-radius: 8px; border: 1px solid #585b70; overflow: hidden; text-align: left; }
+        summary { padding: 15px; cursor: pointer; outline: none; list-style: none; font-weight: bold; color: #cba6f7; display: flex; align-items: center; }
+        summary::-webkit-details-marker { display: none; }
+        summary h3 { margin: 0; font-size: 1.1em; flex-grow: 1; }
+        summary::before { content: "▶"; color: #89b4fa; margin-right: 10px; font-size: 1.2em; transition: 0.3s; }
+        details[open] summary::before { transform: rotate(90deg); color: #a6e3a1; }
+        .details-content { padding: 0 15px 15px 15px; text-align: center; }
+
+        /* Sliders */
+        .slider-container { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; background: #45475a; padding: 10px; border-radius: 8px; }
+        input[type=range] { flex-grow: 1; margin: 0 15px; cursor: pointer; }
+        .calib-input { width: 50px; padding: 4px; background: #11111b; color: #a6e3a1; border: 1px solid #585b70; border-radius: 4px; text-align: center; font-weight: bold; }
+
+        /* Buttons */
+        button { padding: 8px 12px; margin: 4px; cursor: pointer; border-radius: 6px; border: none; background: #89b4fa; color: #11111b; font-weight: bold; transition: 0.2s; text-transform: uppercase; font-size: 0.85em; }
+        button:hover:not(:disabled) { background: #b4befe; transform: translateY(-1px); }
+        button:disabled { background: #585b70; color: #a6adc8; cursor: not-allowed; opacity: 0.7; }
+        
+        .success { background: #a6e3a1; } .success:hover:not(:disabled) { background: #94e2d5; }
+        .danger { background: #f38ba8; } .danger:hover:not(:disabled) { background: #eba0ac; }
+        .warning { background: #f9e2af; } .warning:hover:not(:disabled) { background: #f5e0dc; }
+        .purple { background: #cba6f7; } .purple:hover:not(:disabled) { background: #b4befe; }
+
+        /* Keyboard Hints */
+        .keyboard-hint { font-size: 0.85em; color: #a6adc8; margin: 15px 0; background: #181825; padding: 10px; border-radius: 8px; line-height: 1.8;}
+        kbd { background: #11111b; border: 1px solid #585b70; padding: 2px 6px; border-radius: 4px; color: #a6e3a1; font-family: monospace; font-weight: bold;}
+        
+        /* Renameable Hotkeys */
+        .hotkey-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 10px;}
+        .hotkey-slot { background: #313244; padding: 8px; border-radius: 8px; border: 1px solid #585b70; display: flex; flex-direction: column; gap: 5px;}
+        .hotkey-slot.active { border-color: #a6e3a1; background: #45475a;}
+        .hotkey-name { background: transparent; border: none; color: #89b4fa; font-weight: bold; text-align: center; font-size: 0.85em; outline: none; width: 100%; border-bottom: 1px dashed #585b70; padding-bottom: 2px;}
+        .hotkey-name:focus { border-bottom: 1px solid #a6e3a1; }
+
+        /* General Layout */
+        textarea { width: 90%; height: 60px; margin-top: 10px; background: #11111b; color: #a6e3a1; border: 1px solid #585b70; padding: 10px; font-family: monospace; border-radius: 6px; resize: vertical; }
+        select { padding: 8px; border-radius: 6px; background: #11111b; color: #cdd6f4; border: 1px solid #cba6f7; font-weight: bold; }
+        .controls-row { display: flex; justify-content: center; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;}
+        
+        /* Modals */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #181825; border: 2px solid #89b4fa; padding: 30px; border-radius: 12px; text-align: center; max-width: 400px; width: 100%; box-sizing: border-box; box-shadow: 0 10px 25px rgba(0,0,0,0.8);}
+        .modal-buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        .modal-input { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; background: #11111b; color: white; border: 1px solid #585b70; margin-top: 10px; font-size: 1.1em; text-align: center;}
+
+        /* Top Bar Info */
+        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #181825; padding: 10px 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #585b70; }
+        .safety-toggle { display: flex; align-items: center; gap: 8px; color: #a6e3a1; font-weight: bold; cursor: pointer; }
+
+        /* Demo Overlay */
+        #demo-overlay { display: none; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(11, 14, 20, 0.95); z-index: 500; border-radius: 12px; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px);}
+        #demo-overlay h1 { color: #f38ba8; font-size: 3.5em; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 10px; text-shadow: 0 0 15px rgba(243, 139, 168, 0.5);}
+
+        /* Web AI Picture in Picture */
+        #ai-vision-container { display:none; position: fixed; bottom: 20px; right: 20px; width: 320px; height: 240px; border: 3px solid #cba6f7; border-radius: 12px; overflow: hidden; background: #11111b; z-index: 100; box-shadow: 0 10px 25px rgba(0,0,0,0.8); }
+        #ai-status-overlay { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 4px; font-size: 0.8em; font-weight: bold; color: #a6e3a1; z-index: 101;}
+    </style>
+</head>
+<body>
+
+    <!-- Generic Custom Modals -->
+    <div id="custom-alert-modal" class="modal-overlay">
+        <div class="modal-content" style="border-color: #89b4fa;">
+            <h3 id="alert-title" style="color:#89b4fa; margin-bottom:10px;">System Notice</h3>
+            <p id="alert-text" style="color:#cdd6f4;"></p>
+            <div class="modal-buttons">
+                <button class="purple" onclick="closeCustomAlert()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-confirm-modal" class="modal-overlay">
+        <div class="modal-content" style="border-color: #f38ba8;">
+            <h3 style="color:#f38ba8; margin-bottom:10px;">Confirm Action</h3>
+            <p id="confirm-text" style="color:#cdd6f4;"></p>
+            <div class="modal-buttons">
+                <button class="danger" id="confirm-yes-btn" onclick="confirmYes()">Yes, Proceed</button>
+                <button onclick="closeCustomConfirm()" style="background:#585b70;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-prompt-modal" class="modal-overlay">
+        <div class="modal-content" style="border-color: #a6e3a1;">
+            <h3 id="prompt-title" style="color:#a6e3a1; margin-bottom:10px;">Input Required</h3>
+            <p id="prompt-text" style="color:#cdd6f4;"></p>
+            <input type="text" id="custom-prompt-input" class="modal-input" onkeydown="if(event.key==='Enter') promptSubmit()">
+            <div class="modal-buttons">
+                <button class="success" onclick="promptSubmit()">Submit</button>
+                <button onclick="closeCustomPrompt()" style="background:#585b70;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="demo-setup-modal" class="modal-overlay">
+        <div class="modal-content" style="border-color: #f38ba8;">
+            <h3 style="color:#f38ba8; margin-bottom:10px;">Enable Demo Mode</h3>
+            <p style="color:#cdd6f4; font-size:0.9em;">Locks the interface and runs Shuffle macro continuously. Set a PIN to unlock.</p>
+            <input type="password" id="demo-pin-input" class="modal-input" placeholder="Enter Security PIN" onkeydown="if(event.key==='Enter') startDemoMode()">
+            <div class="modal-buttons">
+                <button class="danger" onclick="startDemoMode()">Lock System</button>
+                <button onclick="closeModals()" style="background:#585b70;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Vision Picture in Picture -->
+    <div id="ai-vision-container">
+        <div id="ai-status-overlay">AI INITIALIZING...</div>
+        <video id="webcam-video" style="display:none;" playsinline></video>
+        <canvas id="webcam-canvas" width="320" height="240" style="width:100%; height:100%;"></canvas>
+    </div>
+
+    <!-- Main App -->
+    <div class="card" id="main-card">
+        
+        <!-- Demo Lock Overlay -->
+        <div id="demo-overlay">
+            <h1>DEMO MODE</h1>
+            <p style="color: #a6adc8; margin-bottom: 30px; font-size: 1.1em;">System locked. Running continuous cycle.</p>
+            <button id="unlock-btn" class="warning" onclick="promptDemoExit()" style="padding: 15px 30px; font-size: 1.2em;">Unlock System</button>
+        </div>
+
+        <h2>Robot Arm Controller</h2>
+        
+        <div class="top-bar">
+            <div style="text-align:left;">
+                <button id="connect" class="success" style="margin:0;">Connect USB</button>
+                <button id="cancel-reconnect-btn" class="danger" style="display:none; margin:0;" onclick="cancelReconnect()">Stop Reconnect</button>
+                <div id="status" style="color: #a6adc8; font-weight: bold; font-size: 0.85em; margin-top:5px;">System Offline</div>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; gap:5px; align-items:flex-end;">
+                <label class="safety-toggle">
+                    <input type="checkbox" id="safety-limit" checked> Speed Limiter
+                </label>
+                <button class="danger" style="padding: 4px 8px; font-size: 0.7em; margin:0;" onclick="document.getElementById('demo-setup-modal').style.display='flex'">Demo Mode</button>
+            </div>
+        </div>
+
+        <!-- MAIN SLIDERS -->
+        <div id="sliders" style="margin-bottom: 20px;"></div>
+
+        <!-- HARDWARE CONTROLS HINT -->
+        <div class="keyboard-hint">
+            <span id="gamepad-status" style="color: #cba6f7; font-weight:bold;">Gamepad: Disconnected</span><br>
+            <kbd>W</kbd> <kbd>S</kbd> Elbow | <kbd>A</kbd> <kbd>D</kbd> Base | <kbd>↑</kbd> <kbd>↓</kbd> Shoulder | <kbd>←</kbd> <kbd>→</kbd> Wrist Pitch | <kbd>Q</kbd> <kbd>E</kbd> Wrist Roll<br>
+            <kbd>SPACE</kbd> Grip | <kbd>F</kbd> Quick Save Pose
+        </div>
+
+        <!-- CONTROLLERS COLLAPSIBLE -->
+        <details>
+            <summary><h3>External Controllers</h3></summary>
+            <div class="details-content">
+                <div class="controls-row">
+                    <button id="ai-btn" class="purple" onclick="toggleAI()">👁️ Start AI Vision (Webcam)</button>
+                    <button id="wii-connect" class="purple" onclick="connectWiimote()">Sync Wiimote</button>
+                </div>
+                <div class="controls-row" style="margin-top: 10px;">
+                    <label style="color: #a6e3a1; font-weight: bold; cursor: pointer; border: 1px solid #585b70; padding: 8px; border-radius: 6px; background: #11111b;">
+                        <input type="checkbox" id="ghost-mode-toggle"> Ghost Mode (Idle Auto-Move)
+                    </label>
+                </div>
+                <p id="wii-status" style="color: #a6adc8; font-weight: bold; margin-top: 10px;">Wiimote: Disconnected</p>
+            </div>
+        </details>
+
+        <!-- HOTKEYS COLLAPSIBLE -->
+        <details open>
+            <summary><h3>Quick-Pose Hotkeys (<kbd>1</kbd> - <kbd>0</kbd>)</h3></summary>
+            <div class="details-content">
+                <div class="hotkey-grid" id="hotkey-grid"></div>
+            </div>
+        </details>
+
+        <!-- ANIMATION SUITE COLLAPSIBLE -->
+        <details>
+            <summary><h3>Animation Suite</h3></summary>
+            <div class="details-content" style="background: #11111b; padding: 15px; border-radius: 8px; border: 1px solid #45475a;">
+                
+                <!-- NEW ANIMATION STYLE TOGGLE -->
+                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #45475a;">
+                    <h4 style="margin:0 0 10px 0; color:#cba6f7;">Animation Style Engine</h4>
+                    <select id="anim-style" style="width: 100%; text-align: center;">
+                        <option value="organic">🌊 Organic (Smooth Bezier Ease-Out)</option>
+                        <option value="robotic">🤖 Robotic (Linear Direct)</option>
+                    </select>
+                </div>
+
+                <div style="border-bottom: 1px solid #45475a; padding-bottom: 15px; margin-bottom: 15px;">
+                    <h4 style="margin:0 0 10px 0; color:#cba6f7;">Current Frame Buffer</h4>
+                    <p style="margin: 0 0 10px 0;">Active Frames: <span id="frameCount" style="font-weight:bold; color:#a6e3a1; font-size: 1.2em;">0</span></p>
+                    <button class="success" onclick="saveFrame()">Add Pose</button>
+                    <button class="danger" onclick="clearFrames()">Clear Buffer</button>
+                    
+                    <div class="controls-row" style="margin-top: 15px;">
+                        <button id="play-btn" class="success" onclick="togglePlay()">Play Buffer</button>
+                        <button class="danger" onclick="stopPlay()">Stop</button>
+                        <label style="margin-left: 10px; cursor: pointer; font-weight: bold; color:#a6adc8;">
+                            <input type="checkbox" id="loop-toggle"> Loop Current
+                        </label>
+                    </div>
+                </div>
+
+                <div style="border-bottom: 1px solid #45475a; padding-bottom: 15px; margin-bottom: 15px;">
+                    <h4 style="margin:0 0 10px 0; color:#cba6f7;">Library & Macros</h4>
+                    <div class="controls-row">
+                        <select id="slotSelect"></select>
+                        <button class="success" onclick="confirmSaveSlotPrompt()">Save to Slot</button>
+                        <button class="warning" onclick="loadFromSlot()">Load Slot</button>
+                    </div>
+                    <div class="controls-row" style="margin-top:10px;">
+                        <button id="slideshow-btn" class="purple" onclick="toggleMacro(false)">Slideshow All</button>
+                        <button id="shuffle-btn" class="purple" onclick="toggleMacro(true)">Shuffle All</button>
+                    </div>
+                    <button class="danger" style="margin-top:10px; width:100%;" onclick="attemptWipeLibrary()">Wipe Entire Library</button>
+                </div>
+
+                <div>
+                    <h4 style="margin:0 0 10px 0; color:#cba6f7;">Timing Settings</h4>
+                    <div class="controls-row">
+                        <div style="display: flex; flex-direction: column; align-items: center; width: 45%;">
+                            <label style="font-weight: bold; color: #89b4fa; margin-bottom: 5px; font-size:0.8em;">Frame Interval: <span id="speed-val">600</span>ms</label>
+                            <input type="range" id="frame-speed" min="100" max="2000" step="50" value="600" oninput="document.getElementById('speed-val').innerText = this.value">
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center; width: 45%;">
+                            <label style="font-weight: bold; color: #f9e2af; margin-bottom: 5px; font-size:0.8em;">Macro Pause: <span id="pause-val">1.0</span>s</label>
+                            <input type="range" id="macro-pause" min="0" max="5000" step="100" value="1000" oninput="document.getElementById('pause-val').innerText = (this.value/1000).toFixed(1)">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </details>
+
+        <!-- CALIBRATION COLLAPSIBLE -->
+        <details>
+            <summary><h3>Hardware Calibration</h3></summary>
+            <div class="details-content">
+                <p style="font-size: 0.8em; color: #a6adc8; margin-top: 0;">Offset degrees if servos are misaligned.</p>
+                <div class="controls-row" id="calib-inputs"></div>
+                <button class="warning" onclick="resetCalibration()">Reset to 0</button>
+            </div>
+        </details>
+        
+        <!-- BACKUP COLLAPSIBLE -->
+        <details>
+            <summary><h3>Backup & Restore</h3></summary>
+            <div class="details-content">
+                <div class="controls-row">
+                    <button onclick="exportAll()">Export System Data</button>
+                    <button onclick="startImport()" class="warning">Import System Data</button>
+                </div>
+                <button onclick="decryptDemoCode()" class="purple" style="margin-top:10px;">🔓 Decrypt Demo Code</button>
+                <textarea id="io-box" placeholder="Data payload box..."></textarea>
+            </div>
+        </details>
+    </div>
+
+    <script>
+        // --- CUSTOM MODALS ---
+        let confirmResolve = null, promptResolve = null;
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(el => el.style.display = 'none'); if (confirmResolve) { confirmResolve(false); confirmResolve = null; } if (promptResolve) { promptResolve(null); promptResolve = null; } }
+        function customAlert(msg, title = "System Notice") { document.getElementById('alert-title').innerText = title; document.getElementById('alert-text').innerText = msg; document.getElementById('custom-alert-modal').style.display = 'flex'; }
+        function closeCustomAlert() { document.getElementById('custom-alert-modal').style.display = 'none'; }
+        function customConfirm(msg) { document.getElementById('confirm-text').innerText = msg; document.getElementById('custom-confirm-modal').style.display = 'flex'; return new Promise(res => { confirmResolve = res; }); }
+        function confirmYes() { document.getElementById('custom-confirm-modal').style.display = 'none'; if(confirmResolve) confirmResolve(true); confirmResolve = null; }
+        function closeCustomConfirm() { document.getElementById('custom-confirm-modal').style.display = 'none'; if(confirmResolve) confirmResolve(false); confirmResolve = null; }
+        function customPrompt(title, msg, type = "text") { document.getElementById('prompt-title').innerText = title; document.getElementById('prompt-text').innerText = msg; let input = document.getElementById('custom-prompt-input'); input.type = type; input.value = ''; document.getElementById('custom-prompt-modal').style.display = 'flex'; input.focus(); return new Promise(res => { promptResolve = res; }); }
+        function promptSubmit() { document.getElementById('custom-prompt-modal').style.display = 'none'; if(promptResolve) promptResolve(document.getElementById('custom-prompt-input').value); promptResolve = null; }
+        function closeCustomPrompt() { document.getElementById('custom-prompt-modal').style.display = 'none'; if(promptResolve) promptResolve(null); promptResolve = null; }
+
+        // --- CORE STATE ---
+        let port, writer;
+        let targetPos = [90, 90, 90, 90, 90, 90, 90]; 
+        let currentPos = [90, 90, 90, 90, 90, 90, 90]; 
+        let lastInputTime = Date.now();
+        let calibrationOffsets = JSON.parse(localStorage.getItem('robotCalibration')) || [0, 0, 0, 0, 0, 0, 0];
+        let currentFrames = [];
+        let savedAnimations = JSON.parse(localStorage.getItem('robotAnims')) || Array(15).fill(null);
+        let savedHotkeys = JSON.parse(localStorage.getItem('robotHotkeysV2')) || Array(10).fill(null);
+        const servoNames = ['Base', 'Shoulder', 'Hidden', 'Elbow', 'W-Pitch', 'W-Roll', 'Gripper'];
+
+        // --- DEMO MODE INIT ---
+        let demoLockCode = localStorage.getItem('robotDemoLock') || "";
+        let isDemoMode = !!demoLockCode;
+        if (isDemoMode) {
+            document.getElementById('demo-overlay').style.display = 'flex';
+            window.addEventListener('load', () => setTimeout(() => toggleMacro(true), 500));
+        }
+
+        // --- GLOBAL INTERPOLATOR (ORGANIC vs ROBOTIC) & WATCHDOG ---
+        setInterval(() => {
+            if (isDemoMode) {
+                let overlay = document.getElementById('demo-overlay');
+                if (!overlay || window.getComputedStyle(overlay).display === 'none' || window.getComputedStyle(overlay).opacity === '0') {
+                    document.body.innerHTML = `<div style="height:100vh; display:flex; justify-content:center; align-items:center; background:#0b0e14;"><h1 style="color:#f38ba8;">SECURITY BREACH. REBOOTING.</h1></div>`;
+                    setTimeout(() => location.reload(), 2000); return; 
+                }
+            }
+
+            let changed = false;
+            let isSafe = document.getElementById('safety-limit').checked;
+            let style = document.getElementById('anim-style') ? document.getElementById('anim-style').value : 'organic';
+            let maxStep = isSafe ? 2 : 180; 
+            
+            for(let i=0; i<7; i++) {
+                if (currentPos[i] !== targetPos[i]) {
+                    let diff = targetPos[i] - currentPos[i];
+                    
+                    if (style === 'organic') {
+                        // Exponential Moving Average (Ease-Out Math)
+                        let easeStep = diff * 0.15; 
+                        if (isSafe && Math.abs(easeStep) > maxStep) easeStep = Math.sign(diff) * maxStep;
+                        if (Math.abs(diff) < 0.5) currentPos[i] = targetPos[i]; // Snap when close to prevent Zeno's paradox
+                        else currentPos[i] += easeStep;
+                    } else {
+                        // Robotic (Linear/Direct)
+                        if (Math.abs(diff) <= maxStep) { currentPos[i] = targetPos[i]; } 
+                        else { currentPos[i] += Math.sign(diff) * maxStep; }
+                    }
+                    
+                    changed = true;
+                    if(document.getElementById(`v${i}`)) document.getElementById(`v${i}`).innerText = Math.round(currentPos[i]) + "°";
+                }
+            }
+
+            // GHOST MODE
+            if (document.getElementById('ghost-mode-toggle').checked && (Date.now() - lastInputTime > 3000) && !isPlaying && !isDemoMode && !aiActive) {
+                let t = Date.now() / 1000;
+                targetPos[0] = 90 + Math.sin(t * 0.5) * 15; 
+                targetPos[1] = 90 + Math.cos(t * 0.3) * 10; 
+            }
+
+            if (changed) { queueSerialUpdate(); }
+        }, 20);
+
+        function updateActivity() { lastInputTime = Date.now(); }
+
+        // --- GOOGLE MEDIAPIPE WEB AI ---
+        const videoElement = document.getElementById('webcam-video');
+        const canvasElement = document.getElementById('webcam-canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        let aiActive = false;
+        let aiCamera = null;
+        let aiHands = null;
+
+        async function initAI() {
+            if (aiHands) return;
+            document.getElementById('ai-status-overlay').innerText = "DOWNLOADING AI MODELS...";
+            
+            aiHands = new Hands({locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            }});
+            
+            aiHands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.6,
+                minTrackingConfidence: 0.6
+            });
+            
+            aiHands.onResults(onAIResults);
+        }
+
+        async function toggleAI() {
+            if (isDemoMode) return customAlert("System is locked.", "Access Denied");
+            
+            if (!aiActive) {
+                aiActive = true;
+                document.getElementById('ai-vision-container').style.display = 'block';
+                document.getElementById('ai-btn').innerText = "🛑 Stop AI Vision";
+                document.getElementById('ai-btn').className = "danger";
+                
+                await initAI();
+                
+                if (!aiCamera) {
+                    aiCamera = new Camera(videoElement, {
+                        onFrame: async () => { await aiHands.send({image: videoElement}); },
+                        width: 320, height: 240
+                    });
+                }
+                aiCamera.start();
+                document.getElementById('ai-status-overlay').innerText = "AI ACTIVE: PUPPET MODE";
+                document.getElementById('ai-status-overlay').style.color = "#a6e3a1";
+            } else {
+                aiActive = false;
+                document.getElementById('ai-vision-container').style.display = 'none';
+                document.getElementById('ai-btn').innerText = "👁️ Start AI Vision (Webcam)";
+                document.getElementById('ai-btn').className = "purple";
+                if (aiCamera) aiCamera.stop();
+            }
+        }
+
+        function onAIResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            // Draw mirrored camera feed
+            canvasCtx.translate(canvasElement.width, 0);
+            canvasCtx.scale(-1, 1);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#89b4fa', lineWidth: 2});
+                drawLandmarks(canvasCtx, landmarks, {color: '#a6e3a1', lineWidth: 1, radius: 2});
+
+                // --- PUPPETEER MATH ---
+                // MediaPipe gives coordinates as 0.0 to 1.0 percentages of the screen.
+
+                // 1. Base (Palm X) - Mapped from middle of screen to avoid stretching
+                let rawX = landmarks[9].x; 
+                let baseX = 180 - ((rawX - 0.2) / 0.6 * 180); 
+
+                // 2. Shoulder/Elbow (Palm Y)
+                let rawY = landmarks[9].y;
+                let liftY = 180 - ((rawY - 0.3) / 0.5 * 180);
+
+                // 3. Wrist Roll (Angle of palm relative to wrist)
+                let angle = Math.atan2(landmarks[9].y - landmarks[0].y, landmarks[9].x - landmarks[0].x);
+                let roll = (angle * 180 / Math.PI) + 90; 
+
+                // 4. Gripper (Distance between Thumb(4) and Index(8))
+                let dx = landmarks[8].x - landmarks[4].x;
+                let dy = landmarks[8].y - landmarks[4].y;
+                let pinchDist = Math.sqrt(dx*dx + dy*dy);
+                let grip = (pinchDist < 0.08) ? 90 : 0; 
+
+                // Apply constraints and send to master interpolator
+                targetPos[0] = Math.max(0, Math.min(180, baseX));
+                targetPos[1] = Math.max(0, Math.min(180, liftY));
+                targetPos[3] = Math.max(0, Math.min(180, 180 - (liftY * 0.7))); // Synergistic IK for Elbow
+                targetPos[5] = Math.max(0, Math.min(180, roll));
+                targetPos[6] = grip;
+
+                updateActivity();
+                syncSliders();
+            }
+            canvasCtx.restore();
+        }
+
+        // Generate Slider UI
+        const sliderDiv = document.getElementById('sliders');
+        for(let i=0; i<7; i++) {
+            if(i === 2) continue;
+            let maxVal = i === 6 ? 90 : 180;
+            sliderDiv.innerHTML += `
+                <div class="slider-container">
+                    <span style="width: 140px; text-align: left; font-weight:bold; font-size:0.9em;">${servoNames[i]} [${i}]</span>
+                    <input type="range" id="s${i}" min="0" max="${maxVal}" value="90" oninput="manualSliderUpdate(${i}, this.value)">
+                    <span id="v${i}" style="width:45px; text-align:right; font-weight:bold; color:#89b4fa;">90°</span>
+                </div>`;
+        }
+        function manualSliderUpdate(index, value) { if (isDemoMode) { syncSliders(); return; } targetPos[index] = parseInt(value); updateActivity(); }
+
+        // --- CALIBRATION UI ---
+        const calibDiv = document.getElementById('calib-inputs');
+        for(let i=0; i<7; i++) {
+            if(i === 2) continue;
+            calibDiv.innerHTML += `<div style="display:flex; flex-direction:column; align-items:center;"><label style="font-size:0.75em; color:#89b4fa;">[${i}]</label><input type="number" id="c${i}" class="calib-input" value="${calibrationOffsets[i]}" onchange="updateCalibration(${i}, this.value)"></div>`;
+        }
+        function updateCalibration(index, value) { if (isDemoMode) return; calibrationOffsets[index] = parseInt(value) || 0; localStorage.setItem('robotCalibration', JSON.stringify(calibrationOffsets)); queueSerialUpdate(); }
+        function resetCalibration() { if (isDemoMode) return; calibrationOffsets = [0,0,0,0,0,0,0]; for(let i=0; i<7; i++) { if(i!==2) document.getElementById(`c${i}`).value = 0; } localStorage.setItem('robotCalibration', JSON.stringify(calibrationOffsets)); queueSerialUpdate(); }
+
+        // --- USB CONNECTION ---
+        let autoReconnectInterval = null, shouldAutoReconnect = true, lastSentData = ""; 
+        document.getElementById('connect').onclick = async () => {
+            if (isDemoMode) return;
+            try { shouldAutoReconnect = true; port = await navigator.serial.requestPort(); await port.open({ baudRate: 9600 }); writer = port.writable.getWriter(); updateStatusConnected(); } 
+            catch (err) { customAlert("Connection failed! Check OS permissions.", "Hardware Error"); }
+        };
+        function updateStatusConnected() { document.getElementById('status').innerText = "System Online"; document.getElementById('status').style.color = "#a6e3a1"; document.getElementById('connect').style.display = "none"; document.getElementById('cancel-reconnect-btn').style.display = "none"; }
+        navigator.serial.addEventListener("disconnect", (event) => { if (port && event.target === port) { document.getElementById('status').innerText = "Disconnected. Auto-reconnecting..."; document.getElementById('status').style.color = "#f38ba8"; document.getElementById('cancel-reconnect-btn').style.display = "inline-block"; port = null; writer = null; if (shouldAutoReconnect) attemptReconnect(); } });
+        async function attemptReconnect() { if (autoReconnectInterval) return; autoReconnectInterval = setInterval(async () => { if (!shouldAutoReconnect) { clearInterval(autoReconnectInterval); autoReconnectInterval = null; return; } try { const ports = await navigator.serial.getPorts(); if (ports.length > 0) { port = ports[0]; await port.open({ baudRate: 9600 }); writer = port.writable.getWriter(); clearInterval(autoReconnectInterval); autoReconnectInterval = null; updateStatusConnected(); } } catch(e) { } }, 2000); }
+        function cancelReconnect() { if (isDemoMode) return; shouldAutoReconnect = false; if (autoReconnectInterval) clearInterval(autoReconnectInterval); autoReconnectInterval = null; document.getElementById('status').innerText = "System Offline"; document.getElementById('status').style.color = "#a6adc8"; document.getElementById('cancel-reconnect-btn').style.display = "none"; document.getElementById('connect').style.display = "inline-block"; }
+
+        // --- USB SENDER ---
+        let serialTimeout = null;
+        async function queueSerialUpdate() {
+            if (!serialTimeout && writer) {
+                serialTimeout = setTimeout(async () => {
+                    try {
+                        let outputPos = currentPos.map((val, i) => { return Math.max(0, Math.min(180, Math.round(val) + calibrationOffsets[i])); });
+                        let outStr = `ALL:${outputPos.join(',')}\n`;
+                        if (outStr !== lastSentData) { await writer.write(new TextEncoder().encode(outStr)); lastSentData = outStr; }
+                    } catch(e) { console.error("Failed to write."); }
+                    serialTimeout = null;
+                }, 80); 
+            }
+        }
+        function syncSliders() { for(let i=0; i<7; i++) { if(i === 2) continue; if(document.getElementById(`s${i}`)) document.getElementById(`s${i}`).value = targetPos[i]; } }
+
+        // --- KEYBOARD CONTROLS ---
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || isDemoMode || aiActive) return; 
+            const key = e.key.toLowerCase(); let changed = false; let step = document.getElementById('safety-limit').checked ? 5 : 20;
+            if (key === 'w') { targetPos[3] = Math.max(0, targetPos[3] - step); changed = true; } 
+            if (key === 's') { targetPos[3] = Math.min(180, targetPos[3] + step); changed = true; } 
+            if (key === 'a') { targetPos[0] = Math.min(180, targetPos[0] + step); changed = true; } 
+            if (key === 'd') { targetPos[0] = Math.max(0, targetPos[0] - step); changed = true; } 
+            if (e.key === 'ArrowUp') { targetPos[1] = Math.max(0, targetPos[1] - step); changed = true; e.preventDefault();} 
+            if (e.key === 'ArrowDown') { targetPos[1] = Math.min(180, targetPos[1] + step); changed = true; e.preventDefault();} 
+            if (e.key === 'ArrowLeft') { targetPos[4] = Math.max(0, targetPos[4] - step); changed = true; e.preventDefault();} 
+            if (e.key === 'ArrowRight') { targetPos[4] = Math.min(180, targetPos[4] + step); changed = true; e.preventDefault();} 
+            if (key === 'q') { targetPos[5] = Math.max(0, targetPos[5] - step); changed = true; } 
+            if (key === 'e') { targetPos[5] = Math.min(180, targetPos[5] + step); changed = true; } 
+            if (key === ' ') { targetPos[6] = (targetPos[6] >= 45) ? 0 : 90; changed = true; e.preventDefault(); }
+            if (key === 'f') { saveFrame(); e.preventDefault(); }
+            if (key >= '0' && key <= '9') { let idx = key === '0' ? 9 : parseInt(key) - 1; goHotkey(idx); changed = true;}
+            if (changed) { updateActivity(); syncSliders(); }
+        });
+
+        // --- NATIVE GAMEPAD ---
+        let gamepadIndex = null, lastGpGrip = false, lastGpSave = false;
+        window.addEventListener("gamepadconnected", (e) => { gamepadIndex = e.gamepad.index; document.getElementById('gamepad-status').innerText = `Gamepad: Connected`; document.getElementById('gamepad-status').style.color = "#a6e3a1"; requestAnimationFrame(pollGamepad); });
+        window.addEventListener("gamepaddisconnected", (e) => { if (e.gamepad.index === gamepadIndex) gamepadIndex = null; document.getElementById('gamepad-status').innerText = "Gamepad: Disconnected"; document.getElementById('gamepad-status').style.color = "#cba6f7"; });
+        function pollGamepad() {
+            if (gamepadIndex === null || isDemoMode || aiActive) return;
+            const gp = navigator.getGamepads()[gamepadIndex]; if (!gp) return;
+            let changed = false, step = document.getElementById('safety-limit').checked ? 2 : 10, deadzone = 0.15;
+            if (Math.abs(gp.axes[1]) > deadzone) { targetPos[3] = Math.max(0, Math.min(180, targetPos[3] + gp.axes[1] * step)); changed = true; }
+            if (Math.abs(gp.axes[0]) > deadzone) { targetPos[0] = Math.max(0, Math.min(180, targetPos[0] + gp.axes[0] * step)); changed = true; }
+            if (Math.abs(gp.axes[3]) > deadzone) { targetPos[1] = Math.max(0, Math.min(180, targetPos[1] + gp.axes[3] * step)); changed = true; }
+            if (Math.abs(gp.axes[2]) > deadzone) { targetPos[4] = Math.max(0, Math.min(180, targetPos[4] - gp.axes[2] * step)); changed = true; }
+            if (gp.buttons[14] && gp.buttons[14].pressed) { targetPos[5] = Math.max(0, targetPos[5] - step); changed = true; }
+            if (gp.buttons[15] && gp.buttons[15].pressed) { targetPos[5] = Math.min(180, targetPos[5] + step); changed = true; }
+            if (gp.buttons[0] && gp.buttons[0].pressed && !lastGpGrip) { targetPos[6] = (targetPos[6] >= 45) ? 0 : 90; changed = true; }
+            lastGpGrip = gp.buttons[0] ? gp.buttons[0].pressed : false;
+            if (gp.buttons[1] && gp.buttons[1].pressed && !lastGpSave) { saveFrame(); } lastGpSave = gp.buttons[1] ? gp.buttons[1].pressed : false;
+            if (changed) { updateActivity(); syncSliders(); }
+            requestAnimationFrame(pollGamepad);
+        }
+
+        // --- RENAMEABLE HOTKEYS ---
+        function renderHotkeys() {
+            const grid = document.getElementById('hotkey-grid'); grid.innerHTML = '';
+            for(let i=0; i<10; i++) {
+                let keyNum = i === 9 ? 0 : i + 1, data = savedHotkeys[i] || { name: `Pose ${keyNum}`, pos: null }, hasData = data.pos !== null;
+                grid.innerHTML += `<div class="hotkey-slot ${hasData ? 'active' : ''}"><div style="font-size: 0.7em; color: #a6adc8; text-align:left;">KEY [${keyNum}]</div><input type="text" class="hotkey-name" value="${data.name}" onchange="updateHotkeyName(${i}, this.value)"><div style="display:flex; gap: 5px; margin-top:5px;"><button class="success" style="flex: 1; padding: 4px; font-size: 0.7em;" onclick="setHotkey(${i})">SET</button><button class="purple" style="flex: 1; padding: 4px; font-size: 0.7em;" onclick="goHotkey(${i})" ${hasData ? '' : 'disabled'}>GO</button></div></div>`;
+            }
+        }
+        renderHotkeys();
+        function updateHotkeyName(index, newName) { if (isDemoMode) return; if (!savedHotkeys[index]) savedHotkeys[index] = { name: newName, pos: null }; else savedHotkeys[index].name = newName; localStorage.setItem('robotHotkeysV2', JSON.stringify(savedHotkeys)); }
+        function setHotkey(index) { if (isDemoMode) return customAlert("System is locked.", "Access Denied"); let currentName = savedHotkeys[index] ? savedHotkeys[index].name : `Pose ${index+1}`; savedHotkeys[index] = { name: currentName, pos: [...targetPos] }; localStorage.setItem('robotHotkeysV2', JSON.stringify(savedHotkeys)); renderHotkeys(); }
+        function goHotkey(index) { if (isDemoMode) return; if (savedHotkeys[index] && savedHotkeys[index].pos) { targetPos = [...savedHotkeys[index].pos]; updateActivity(); syncSliders(); } }
+
+        // --- WIIMOTE INTEGRATION ---
+        let wiimote = null, isWiiCalibrated = false, wiiCalib = {x: 128, y: 128, z: 128}, gripperClosed = false, lastWiiB = false, smoothX = 128, smoothY = 128;
+        async function connectWiimote() { if (isDemoMode) return; if (!navigator.hid) return customAlert("WebHID not supported in this browser.", "Error"); try { const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x057e }] }); if (devices.length > 0) { wiimote = devices[0]; await wiimote.open(); await wiimote.sendReport(0x12, new Uint8Array([0x00, 0x31])); wiimote.addEventListener('inputreport', handleWiiData); document.getElementById('wii-status').innerText = "Status: Waiting for Calibration (+)"; document.getElementById('wii-status').style.color = "#f9e2af"; document.getElementById('wii-instructions').style.display = "block"; document.getElementById('wii-connect').style.display = "none"; } } catch (err) { customAlert("Wiimote connection failed. Make sure it is paired to the OS.", "Hardware Error"); } }
+        function handleWiiData(event) {
+            if (event.reportId !== 0x31 || isDemoMode || aiActive) return; 
+            const data = event.data, btn0 = data.getUint8(0), btn1 = data.getUint8(1), btnA = (btn1 & 0x08) !== 0, btnB = (btn1 & 0x04) !== 0, btnPlus = (btn0 & 0x10) !== 0, ax = data.getUint8(2), ay = data.getUint8(3), az = data.getUint8(4);
+            if (btnPlus) { wiiCalib = {x: ax, y: ay, z: az}; isWiiCalibrated = true; document.getElementById('wii-status').innerText = "Status: Calibrated & Active!"; document.getElementById('wii-status').style.color = "#a6e3a1"; }
+            if (!isWiiCalibrated) return;
+            if (btnB && !lastWiiB) { gripperClosed = !gripperClosed; targetPos[6] = gripperClosed ? 90 : 0; updateActivity(); syncSliders(); }
+            lastWiiB = btnB;
+            if (btnA) { document.getElementById('wii-status').innerText = "Status: PAUSED"; document.getElementById('wii-status').style.color = "#f38ba8"; return; } 
+            else { document.getElementById('wii-status').innerText = "Status: Active!"; document.getElementById('wii-status').style.color = "#a6e3a1"; }
+            smoothX = (ax * 0.15) + (smoothX * 0.85); smoothY = (ay * 0.15) + (smoothY * 0.85);
+            let pitch = Math.max(0, Math.min(180, Math.round(90 + ((smoothY - wiiCalib.y) * 3)))), roll = Math.max(0, Math.min(180, Math.round(90 - ((smoothX - wiiCalib.x) * 3))));
+            if (targetPos[1] !== pitch || targetPos[0] !== roll) { targetPos[1] = pitch; targetPos[0] = roll; updateActivity(); syncSliders(); }
+        }
+
+        // --- ANIMATION / MACRO LOGIC ---
+        function saveFrame() { if (isDemoMode) return customAlert("System is locked.", "Access Denied"); targetPos.forEach((v,i) => currentPos[i] = v); currentFrames.push([...targetPos]); document.getElementById('frameCount').innerText = currentFrames.length; }
+        function clearFrames() { if (isDemoMode) return customAlert("System is locked.", "Access Denied"); stopPlay(); currentFrames = []; document.getElementById('frameCount').innerText = "0"; }
+
+        let isPlaying = false, isPaused = false, playIndex = 0, isMacroPlaying = false, activeLoopId = 0;
+        
+        async function togglePlay() {
+            if (isDemoMode) return;
+            if (currentFrames.length === 0) return customAlert("Cannot play: The buffer is empty.", "Playback Error");
+            if (!isPlaying) { isPlaying = true; isPaused = false; activeLoopId++; document.getElementById('play-btn').innerText = "Pause"; playLoop(activeLoopId); } 
+            else if (!isPaused) { isPaused = true; document.getElementById('play-btn').innerText = "Resume"; } 
+            else { isPaused = false; document.getElementById('play-btn').innerText = "Pause"; }
+        }
+
+        function stopPlay() {
+            isPlaying = false; isPaused = false; isMacroPlaying = false; activeLoopId++; playIndex = 0;
+            document.getElementById('play-btn').innerText = "Play Buffer";
+            let ssBtn = document.getElementById('slideshow-btn'), shBtn = document.getElementById('shuffle-btn');
+            if (ssBtn && shBtn) { ssBtn.innerText = "Slideshow All"; ssBtn.className = "purple"; ssBtn.disabled = false; shBtn.innerText = "Shuffle All"; shBtn.className = "purple"; shBtn.disabled = false; }
+        }
+
+        async function playLoop(loopId) {
+            while (isPlaying && loopId === activeLoopId) {
+                if (isPaused) { await new Promise(r => setTimeout(r, 100)); continue; }
+                if (playIndex >= currentFrames.length) { if (document.getElementById('loop-toggle').checked && !isMacroPlaying) playIndex = 0; else break; }
+                if (playIndex < currentFrames.length) {
+                    let frame = currentFrames[playIndex];
+                    frame.forEach((val, i) => { targetPos[i] = val; });
+                    syncSliders(); updateActivity(); playIndex++;
+                    await new Promise(r => setTimeout(r, parseInt(document.getElementById('frame-speed').value))); 
+                }
+            }
+            if(!isMacroPlaying && loopId === activeLoopId && !isDemoMode) stopPlay();
+            if(isDemoMode && !isMacroPlaying) { playIndex = 0; } 
+        }
+
+        async function toggleMacro(shuffle) {
+            if(isMacroPlaying && !isDemoMode) { stopPlay(); return; }
+            let activeSlots = []; for(let i=0; i<15; i++) if(savedAnimations[i] && savedAnimations[i].length > 0) activeSlots.push(i);
+            if(activeSlots.length === 0) return customAlert("Cannot start macro: The library is empty.", "Macro Error");
+            
+            stopPlay(); activeLoopId++; let macroLoopId = activeLoopId; isMacroPlaying = true;
+            if (shuffle) { document.getElementById('shuffle-btn').innerText = "Stop Shuffle"; document.getElementById('shuffle-btn').className = "danger"; document.getElementById('slideshow-btn').disabled = true; } 
+            else { document.getElementById('slideshow-btn').innerText = "Stop Slideshow"; document.getElementById('slideshow-btn').className = "danger"; document.getElementById('shuffle-btn').disabled = true; }
+
+            while (isMacroPlaying && macroLoopId === activeLoopId) {
+                let playSequence = [...activeSlots];
+                if(shuffle) playSequence.sort(() => Math.random() - 0.5);
+                for(let slot of playSequence) {
+                    if(!isMacroPlaying || macroLoopId !== activeLoopId) break; 
+                    currentFrames = JSON.parse(JSON.stringify(savedAnimations[slot]));
+                    document.getElementById('frameCount').innerText = currentFrames.length;
+                    playIndex = 0; isPlaying = true; isPaused = false; document.getElementById('play-btn').innerText = "Pause";
+                    await playLoop(macroLoopId); 
+                    if(!isMacroPlaying || macroLoopId !== activeLoopId) break; 
+                    await new Promise(r => setTimeout(r, parseInt(document.getElementById('macro-pause').value)));
+                }
+            }
+        }
+
+        // --- STORAGE & EXPORT ---
+        function updateSlotDropdown() { const select = document.getElementById('slotSelect'); select.innerHTML = ''; for(let i=0; i<15; i++) { let count = savedAnimations[i] ? savedAnimations[i].length : 0; select.innerHTML += `<option value="${i}">Slot ${i+1} (${count > 0 ? count + ' frames' : 'Empty'})</option>`; } }
+        updateSlotDropdown();
+
+        async function attemptWipeLibrary() { if (isDemoMode) return customAlert("System is locked.", "Access Denied"); let result = await customConfirm("Are you sure you want to permanently wipe all 15 Library slots? This cannot be undone."); if (result) { savedAnimations = Array(15).fill(null); localStorage.setItem('robotAnims', JSON.stringify(savedAnimations)); updateSlotDropdown(); customAlert("Library memory has been completely wiped.", "Wipe Successful"); } }
+        async function confirmSaveSlotPrompt() { if (isDemoMode) return customAlert("System is locked.", "Access Denied"); if(currentFrames.length === 0) return customAlert("The buffer is empty. Add poses before saving.", "Save Error"); const slot = parseInt(document.getElementById('slotSelect').value); let result = await customConfirm(`Overwrite Slot ${slot+1} with current animation buffer?`); if(result) { savedAnimations[slot] = JSON.parse(JSON.stringify(currentFrames)); localStorage.setItem('robotAnims', JSON.stringify(savedAnimations)); updateSlotDropdown(); } }
+        function loadFromSlot() { if (isDemoMode) return customAlert("System is locked.", "Access Denied"); const slot = parseInt(document.getElementById('slotSelect').value); if(!savedAnimations[slot] || savedAnimations[slot].length === 0) return customAlert("That slot is empty!", "Load Error"); stopPlay(); currentFrames = JSON.parse(JSON.stringify(savedAnimations[slot])); document.getElementById('frameCount').innerText = currentFrames.length; currentFrames[0].forEach((val, i) => { targetPos[i] = val; }); syncSliders(); queueSerialUpdate(); }
+
+        // --- DEMO MODE (ENCRYPTION & LOCK) ---
+        function startDemoMode() { let pin = document.getElementById('demo-pin-input').value; if(!pin) return customAlert("Please enter a PIN to lock the system.", "Missing PIN"); demoLockCode = btoa(encodeURIComponent("RBT_" + pin)); localStorage.setItem('robotDemoLock', demoLockCode); isDemoMode = true; document.getElementById('demo-overlay').style.display = 'flex'; closeModals(); toggleMacro(true); }
+        async function promptDemoExit() { let attempt = await customPrompt("Unlock System", "Enter Security PIN to unlock:", "password"); if (attempt === null) return; let encodedAttempt = btoa(encodeURIComponent("RBT_" + attempt)); if (encodedAttempt === demoLockCode) { isDemoMode = false; demoLockCode = ""; localStorage.removeItem('robotDemoLock'); document.getElementById('demo-overlay').style.display = 'none'; document.getElementById('demo-pin-input').value = ""; stopPlay(); } else { customAlert("The PIN entered is incorrect.", "ACCESS DENIED"); } }
+        async function decryptDemoCode() { if (isDemoMode) return customAlert("System is locked.", "Access Denied"); let code = await customPrompt("Decrypt Demo Code", "Paste the exported Demo Lock Code here:"); if (!code) return; try { let decoded = decodeURIComponent(atob(code)); if (decoded.startsWith("RBT_")) { let recoveredPin = decoded.substring(4); customAlert(`The decrypted PIN is: ${recoveredPin}`, "Decryption Successful"); } else { customAlert("This is not a valid Demo Code format.", "Decryption Failed"); } } catch(e) { customAlert("Invalid code structure. Could not decrypt.", "Decryption Failed"); } }
+
+        // --- IMPORT/EXPORT FULL ---
+        function exportAll() { if (isDemoMode) return customAlert("System is locked.", "Access Denied"); let exportData = { slots: savedAnimations, hotkeys: savedHotkeys, calib: calibrationOffsets }; if(demoLockCode) exportData.demoLock = demoLockCode; document.getElementById('io-box').value = JSON.stringify(exportData); customAlert("System Data exported to the text box.", "Export Successful"); }
+        function startImport() {
+            if (isDemoMode) return customAlert("System is locked.", "Access Denied");
+            try {
+                const parsed = JSON.parse(document.getElementById('io-box').value);
+                let importedSlots = [], importedHotkeys = null, importedCalib = null, importedDemoLock = null;
+                if (Array.isArray(parsed) && parsed.length === 15) { importedSlots = parsed; } else if (parsed.slots && parsed.hotkeys) { importedSlots = parsed.slots; importedHotkeys = parsed.hotkeys; importedCalib = parsed.calib; if (parsed.demoLock) importedDemoLock = parsed.demoLock; } else { throw new Error("Format"); }
+                if (importedDemoLock) { demoLockCode = importedDemoLock; localStorage.setItem('robotDemoLock', demoLockCode); isDemoMode = true; document.getElementById('demo-overlay').style.display = 'flex'; setTimeout(() => toggleMacro(true), 500); customAlert("System locked from imported data.", "Demo Mode Active"); }
+                if (importedHotkeys) { savedHotkeys = importedHotkeys.map((hk, i) => { if (!hk) return null; if (Array.isArray(hk)) return { name: `Pose ${i===9 ? 0 : i+1}`, pos: hk }; return hk; }); localStorage.setItem('robotHotkeysV2', JSON.stringify(savedHotkeys)); renderHotkeys(); }
+                if (importedCalib) { calibrationOffsets = importedCalib; for(let i=0; i<7; i++) { if(i!==2) document.getElementById(`c${i}`).value = calibrationOffsets[i]; } localStorage.setItem('robotCalibration', JSON.stringify(calibrationOffsets)); }
+                importConflicts = []; pendingImportData = Array(15).fill(null);
+                for(let i=0; i<15; i++) { let local = savedAnimations[i], imp = importedSlots[i]; if (imp && imp.length > 0) { if (local && local.length > 0 && JSON.stringify(local) !== JSON.stringify(imp)) importConflicts.push({ slot: i, local: local, imp: imp }); else pendingImportData[i] = imp; } else pendingImportData[i] = local; }
+                if (importConflicts.length > 0) { currentConflictIndex = 0; showConflictUI(); } else finishImport();
+            } catch(e) { customAlert("The pasted code is invalid or corrupted.", "Format Error"); }
+        }
+        function showConflictUI() { let conf = importConflicts[currentConflictIndex]; document.getElementById('conflict-text').innerText = `Conflict detected in Slot ${conf.slot + 1}:`; document.getElementById('conf-local').innerText = conf.local.length; document.getElementById('conf-imp').innerText = conf.imp.length; document.getElementById('conflict-modal').style.display = "flex"; }
+        function resolveConflict(decision) { let conf = importConflicts[currentConflictIndex]; if (decision === 'local') pendingImportData[conf.slot] = conf.local; else if (decision === 'import') pendingImportData[conf.slot] = conf.imp; else if (decision === 'merge') pendingImportData[conf.slot] = conf.local.concat(conf.imp); currentConflictIndex++; if (currentConflictIndex < importConflicts.length) showConflictUI(); else { closeModals(); finishImport(); } }
+        function cancelImport() { closeModals(); customAlert("The import sequence was cancelled.", "Import Cancelled"); }
+        function finishImport() { savedAnimations = pendingImportData; localStorage.setItem('robotAnims', JSON.stringify(savedAnimations)); updateSlotDropdown(); customAlert("System data imported successfully.", "Import Complete"); }
+    </script>
+</body>
+</html>
